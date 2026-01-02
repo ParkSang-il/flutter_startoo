@@ -81,13 +81,13 @@ class AuthProvider with ChangeNotifier {
   }
 
   // 인증번호 검증
-  Future<bool> verifyCode(String phone, String code) async {
+  Future<bool> verifyCode(String phone, String code, {bool isRegister = false}) async {
     _setLoading(true);
     _setError(null);
 
     try {
       debugPrint('=== 인증번호 검증 시작 ===');
-      debugPrint('Phone: $phone, Code: $code');
+      debugPrint('Phone: $phone, Code: $code, isRegister: $isRegister');
       
       final response = await _authService.verifyCode(phone, code);
 
@@ -111,28 +111,44 @@ class AuthProvider with ChangeNotifier {
         return false;
       }
 
-      // 기존 사용자인 경우 (exists: true)
-      if (checkResponse.data!.exists && checkResponse.data!.user != null) {
-        debugPrint('기존 사용자 확인 - 로그인 처리');
-        
-        // 로그인 API 호출하여 토큰 받기 (phone만 전송)
-        final loginResponse = await _authService.login(phone);
-        if (loginResponse.success && loginResponse.data != null) {
-          _currentUser = loginResponse.data!.user;
-          debugPrint('로그인 성공 - 사용자 정보 업데이트');
-          return true;
+      // 로그인 플로우(isRegister: false)일 때만 로그인 로직 실행
+      if (!isRegister) {
+        // 기존 사용자인 경우 (exists: true)
+        if (checkResponse.data!.exists && checkResponse.data!.user != null) {
+          debugPrint('기존 사용자 확인 - 로그인 처리');
+          
+          // 로그인 API 호출하여 토큰 받기 (phone만 전송)
+          final loginResponse = await _authService.login(phone);
+          if (loginResponse.success && loginResponse.data != null) {
+            _currentUser = loginResponse.data!.user;
+            debugPrint('로그인 성공 - 사용자 정보 업데이트');
+            return true;
+          } else {
+            debugPrint('로그인 API 실패: ${loginResponse.message}');
+            // 로그인 실패 시 중복 체크에서 받은 사용자 정보라도 사용
+            _currentUser = checkResponse.data!.user;
+            _setError(loginResponse.message);
+            return false;
+          }
         } else {
-          debugPrint('로그인 API 실패: ${loginResponse.message}');
-          // 로그인 실패 시 중복 체크에서 받은 사용자 정보라도 사용
-          _currentUser = checkResponse.data!.user;
-          _setError(loginResponse.message);
+          // 신규 사용자인 경우 에러 (로그인 플로우인데 가입되지 않은 번호)
+          debugPrint('신규 사용자 확인 - 로그인 불가');
+          _setError('가입되지 않은 번호입니다. 회원가입을 진행해주세요.');
           return false;
         }
+      } else {
+        // 회원가입 플로우(isRegister: true)일 때
+        if (checkResponse.data!.exists && checkResponse.data!.user != null) {
+          // 기존 사용자인 경우 에러 (이미 가입된 번호)
+          debugPrint('기존 사용자 확인 - 회원가입 불가');
+          _setError('이미 가입된 번호입니다. 로그인을 진행해주세요.');
+          return false;
+        } else {
+          // 신규 사용자인 경우 회원가입 플로우로 이동
+          debugPrint('신규 사용자 확인 - 회원가입 플로우로 이동');
+          return true;
+        }
       }
-
-      // 신규 사용자인 경우 (exists: false) - 회원가입 플로우로 이동
-      debugPrint('신규 사용자 확인 - 회원가입 플로우로 이동');
-      return true;
     } catch (e) {
       _setLoading(false);
       debugPrint('인증번호 검증 예외 발생: $e');

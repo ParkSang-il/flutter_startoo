@@ -103,19 +103,15 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 flutter_native_splash:
   color: "#212121"               # 배경색 (다크 테마)
-  image: assets/images/startoo_eyes2.png  # 로고 이미지 경로
+  image: assets/images/splash_logo.png  # 로고 이미지 경로
   color_dark: "#212121"          # 다크 모드 배경색
-  image_dark: assets/images/startoo_eyes2.png  # 다크 모드 로고 이미지
-  branding_mode: bottom
-  branding: assets/images/bottom_logo.png
+  image_dark: assets/images/splash_logo.png  # 다크 모드 로고 이미지
 
   android_12:                   # 안드로이드 12 이상 대응
-    image: assets/images/startoo_eyes2.png
+    image: assets/images/splash_logo.png
     color: "#212121"
     color_dark: "#212121"
-    image_dark: assets/images/startoo_eyes2.png
-    branding_mode: bottom
-    branding: assets/images/bottom_logo.png
+    image_dark: assets/images/splash_logo.png
 
   fullscreen: true              # 전체 화면 여부
   android: true                 # 안드로이드 활성화

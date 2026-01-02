@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:starttoo/screens/feed/feed_list_screen.dart';
 import '../providers/auth_provider.dart';
 import '../utils/api_client.dart';
 import 'home_screen.dart';
@@ -38,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen> {
           FlutterNativeSplash.remove();
           // 사용자 정보를 성공적으로 가져왔으면 홈으로 이동
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            MaterialPageRoute(builder: (context) => const FeedListPage()),
           );
         } else {
           // 토큰이 유효하지 않고 리프레시도 실패한 경우 로그인 화면으로

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/snackbar_helper.dart';
 
 class RegisterScreen extends StatefulWidget {
   final String phone;
@@ -61,11 +62,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage ?? '회원가입에 실패했습니다.'),
-          backgroundColor: Colors.red,
-        ),
+      SnackBarHelper.showError(
+        context,
+        authProvider.errorMessage ?? '회원가입에 실패했습니다.',
       );
     }
   }
@@ -77,16 +76,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            '뒤로',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontSize: 16,
-            ),
-          ),
-        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(

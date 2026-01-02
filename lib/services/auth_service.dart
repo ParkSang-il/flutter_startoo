@@ -239,7 +239,7 @@ class AuthService {
         if (authResponse.data!.accessToken != null) {
           await _apiClient.saveTokens(
             authResponse.data!.accessToken!,
-            authResponse.data!.refreshToken,
+            null, // refresh_token 없음
           );
           debugPrint('토큰 저장 완료');
         } else {
@@ -283,7 +283,7 @@ class AuthService {
       if (authResponse.success && authResponse.data != null) {
         await _apiClient.saveTokens(
           authResponse.data!.accessToken!,
-          authResponse.data!.refreshToken,
+          null, // refresh_token 없음
         );
       }
 
@@ -373,19 +373,19 @@ class AuthService {
     }
   }
 
-  // 토큰 리프레시
+  // 토큰 리프레시 (access_token을 사용하여 새로운 access_token 받기)
   Future<bool> refreshToken() async {
     try {
       debugPrint('=== 토큰 리프레시 시작 ===');
-      final refreshToken = await _apiClient.getRefreshToken();
-      if (refreshToken == null) {
-        debugPrint('리프레시 토큰이 없습니다');
+      final accessToken = await _apiClient.getAccessToken();
+      if (accessToken == null) {
+        debugPrint('액세스 토큰이 없습니다');
         return false;
       }
 
       final response = await _apiClient.dio.post(
         '/auth/refresh',
-        data: {'refresh_token': refreshToken},
+        data: {'token': accessToken}, // access_token을 사용하여 리프레시
       );
 
       debugPrint('리프레시 API 응답: ${response.statusCode}');
@@ -393,11 +393,10 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = response.data['data'] ?? response.data;
-        final accessToken = data['access_token'] ?? data['token'];
-        final newRefreshToken = data['refresh_token'];
+        final newAccessToken = data['token'];
         
-        if (accessToken != null) {
-          await _apiClient.saveTokens(accessToken, newRefreshToken);
+        if (newAccessToken != null) {
+          await _apiClient.saveTokens(newAccessToken, null); // refresh_token 없음
           debugPrint('토큰 리프레시 성공');
           return true;
         }

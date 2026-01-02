@@ -37,7 +37,7 @@ class AuthData {
     return AuthData(
       // API에서 token 또는 access_token으로 반환될 수 있음
       accessToken: json['token'] ?? json['access_token'],
-      refreshToken: json['refresh_token'],
+      refreshToken: json['token'],
       user: json['user'] != null ? User.fromJson(json['user']) : null,
       isExistingUser: json['is_existing_user'],
       verificationToken: json['verification_token'],

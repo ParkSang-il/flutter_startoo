@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/phone_formatter.dart';
+import '../../utils/snackbar_helper.dart';
 import 'verification_code_screen.dart';
 
 class PhoneInputScreen extends StatefulWidget {
@@ -61,11 +62,9 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
       );
     } else {
       // 에러 메시지 표시
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage ?? '인증번호 발송에 실패했습니다.'),
-          backgroundColor: Colors.red,
-        ),
+      SnackBarHelper.showError(
+        context,
+        authProvider.errorMessage ?? '인증번호 발송에 실패했습니다.',
       );
     }
   }
@@ -77,15 +76,8 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            '뒤로',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontSize: 16,
-            ),
-          ),
+        iconTheme: IconThemeData(
+          color: Theme.of(context).colorScheme.primary
         ),
       ),
       body: SafeArea(

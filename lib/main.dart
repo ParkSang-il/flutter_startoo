@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:starttoo/screens/feed/feed_list_screen.dart';
 import 'providers/auth_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
@@ -24,9 +25,11 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Starttoo',
         debugShowCheckedModeBanner: false,
+        debugShowMaterialGrid: false, // Material Grid 비활성화
+        showPerformanceOverlay: false, // Performance Overlay 비활성화
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.black,
+            seedColor: const Color(0xFF3FD1FF),
             brightness: Brightness.dark,
           ),
           useMaterial3: true,
@@ -34,7 +37,7 @@ class MyApp extends StatelessWidget {
         ),
         home: const SplashScreen(),
         routes: {
-          '/home': (context) => const HomeScreen(),
+          '/home': (context) => const FeedListPage(),
         },
       ),
     );

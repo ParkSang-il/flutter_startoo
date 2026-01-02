@@ -52,21 +52,22 @@ class ApiClient {
 
   Future<bool> _refreshToken() async {
     try {
-      final refreshToken = await _storage.read(key: 'refresh_token');
-      if (refreshToken == null) return false;
+      final accessToken = await _storage.read(key: 'access_token');
+      if (accessToken == null) return false;
 
       final response = await _dio.post(
         '/auth/refresh',
-        data: {'refresh_token': refreshToken},
+        data: {'token': accessToken}, // access_token을 사용하여 리프레시
       );
 
       if (response.statusCode == 200) {
-        final data = response.data['data'];
-        await _storage.write(key: 'access_token', value: data['access_token']);
-        if (data['refresh_token'] != null) {
-          await _storage.write(key: 'refresh_token', value: data['refresh_token']);
+        final data = response.data['data'] ?? response.data;
+        final newAccessToken = data['token'];
+        
+        if (newAccessToken != null) {
+          await _storage.write(key: 'access_token', value: newAccessToken);
+          return true;
         }
-        return true;
       }
       return false;
     } catch (e) {
@@ -76,29 +77,27 @@ class ApiClient {
 
   Dio get dio => _dio;
 
-  // 토큰 저장
+  // 토큰 저장 (refresh_token 없음)
   Future<void> saveTokens(String accessToken, String? refreshToken) async {
     await _storage.write(key: 'access_token', value: accessToken);
-    if (refreshToken != null) {
-      await _storage.write(key: 'refresh_token', value: refreshToken);
-    }
+    // refresh_token은 사용하지 않음
+  }
+  
+  // 액세스 토큰 가져오기
+  Future<String?> getAccessToken() async {
+    return await _storage.read(key: 'access_token');
   }
 
   // 토큰 삭제
   Future<void> clearTokens() async {
     await _storage.delete(key: 'access_token');
-    await _storage.delete(key: 'refresh_token');
+    // refresh_token은 사용하지 않음
   }
 
   // 토큰 확인
   Future<bool> hasToken() async {
     final token = await _storage.read(key: 'access_token');
     return token != null;
-  }
-
-  // 리프레시 토큰 가져오기
-  Future<String?> getRefreshToken() async {
-    return await _storage.read(key: 'refresh_token');
   }
 }
 

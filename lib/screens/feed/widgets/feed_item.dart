@@ -3,18 +3,22 @@ import 'package:flutter/material.dart';
 class FeedItem extends StatelessWidget {
   final int index;
 
-  const FeedItem({super.key, required this.index});
+  const FeedItem({
+    super.key,
+    required this.index,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 420,
-      margin: const EdgeInsets.only(bottom: 16),
+      height: 380,
+      margin: const EdgeInsets.only(bottom: 12),
       color: Colors.grey.shade200,
-      alignment: Alignment.center,
-      child: Text(
-        'Post $index',
-        style: const TextStyle(fontSize: 18),
+      child: Center(
+        child: Text(
+          'Feed Item $index',
+          style: const TextStyle(fontSize: 18),
+        ),
       ),
     );
   }

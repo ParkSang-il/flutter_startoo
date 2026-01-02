@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'widgets/feed_item.dart';
+import '../../providers/auth_provider.dart';
+import '../auth/login_or_register_screen.dart';
 
 class FeedListPage extends StatefulWidget {
   const FeedListPage({super.key});
@@ -94,7 +97,7 @@ class _FeedListPageState extends State<FeedListPage> {
           // Feed List
           SliverList(
             delegate: SliverChildBuilderDelegate(
-              (context, index) => _FeedItem(index),
+              (context, index) => FeedItem(index: index),
               childCount: 30,
             ),
           ),
@@ -105,23 +108,3 @@ class _FeedListPageState extends State<FeedListPage> {
   }
 }
 
-class _FeedItem extends StatelessWidget {
-  final int index;
-
-  const _FeedItem(this.index);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 380,
-      margin: const EdgeInsets.only(bottom: 12),
-      color: Colors.grey.shade200,
-      child: Center(
-        child: Text(
-          'Feed Item $index',
-          style: const TextStyle(fontSize: 18),
-        ),
-      ),
-    );
-  }
-}

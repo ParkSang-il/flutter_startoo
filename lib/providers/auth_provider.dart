@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/auth_response.dart';
+import '../models/api_response.dart';
+import '../models/portfolio_model.dart';
 import '../services/auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -164,18 +166,12 @@ class AuthProvider with ChangeNotifier {
     required int userType,
     String? nickname,
   }) async {
-    if (_verificationToken == null) {
-      _setError('인증이 완료되지 않았습니다.');
-      return false;
-    }
-
     _setLoading(true);
     _setError(null);
 
     try {
       final response = await _authService.register(
         phone: phone,
-        verificationToken: _verificationToken!,
         userType: userType,
         nickname: nickname,
       );
@@ -187,7 +183,6 @@ class AuthProvider with ChangeNotifier {
       }
 
       _currentUser = response.data!.user;
-      _verificationToken = null; // 회원가입 완료 후 토큰 제거
       return true;
     } catch (e) {
       _setLoading(false);
@@ -227,40 +222,36 @@ class AuthProvider with ChangeNotifier {
     _setError(null);
 
     try {
-      debugPrint('=== 사용자 정보 가져오기 시작 ===');
+      debugPrint('=== AuthProvider.getMe 시작 ===');
       final response = await _authService.getMe();
+      debugPrint('=== AuthProvider.getMe 응답 받음 ===');
+      debugPrint('성공 여부: ${response.success}');
+      debugPrint('메시지: ${response.message}');
+      debugPrint('데이터 존재 여부: ${response.data != null}');
+      
       _setLoading(false);
 
       if (!response.success || response.data == null) {
-        debugPrint('getMe 실패: ${response.message}');
-        
-        // 토큰이 만료되었을 수 있으므로 리프레시 시도
-        debugPrint('토큰 리프레시 시도...');
-        final refreshSuccess = await _authService.refreshToken();
-        
-        if (refreshSuccess) {
-          debugPrint('토큰 리프레시 성공 - getMe 재시도');
-          // 리프레시 성공 시 다시 getMe 호출
-          final retryResponse = await _authService.getMe();
-          if (retryResponse.success && retryResponse.data != null) {
-            _currentUser = retryResponse.data;
-            debugPrint('getMe 재시도 성공');
-            return true;
-          }
-        } else {
-          debugPrint('토큰 리프레시 실패');
-        }
-        
-        // 리프레시도 실패하면 사용자 정보를 null로 설정
+        debugPrint('=== getMe 실패 ===');
+        debugPrint('실패 메시지: ${response.message}');
+        // 401 에러는 인터셉터에서 이미 토큰 삭제 처리됨
+        // 여기서는 바로 실패 처리
         _currentUser = null;
+        debugPrint('=== getMe 실패 - 사용자 정보 null 설정 ===');
         return false;
       }
 
       _currentUser = response.data;
+      debugPrint('=== getMe 성공 - 사용자 정보 설정 완료 ===');
+      debugPrint('사용자 ID: ${_currentUser?.id}');
+      debugPrint('사용자 이름: ${_currentUser?.username}');
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
       _setLoading(false);
-      debugPrint('getMe 예외 발생: $e');
+      debugPrint('=== AuthProvider.getMe 예외 발생 ===');
+      debugPrint('에러 타입: ${e.runtimeType}');
+      debugPrint('에러 메시지: $e');
+      debugPrint('스택 트레이스: $stackTrace');
       _currentUser = null;
       return false;
     }
@@ -270,6 +261,96 @@ class AuthProvider with ChangeNotifier {
   void setUser(User? user) {
     _currentUser = user;
     notifyListeners();
+  }
+
+  // 사업자 추가정보 등록
+  Future<Map<String, dynamic>> registerBusinessInfo({
+    required String businessName,
+    required String businessNumber,
+    required String? businessCertificate,
+    required String? licenseCertificate,
+    required String? safetyEducationCertificate,
+    required String address,
+    String? addressDetail,
+    required bool contactPhonePublic,
+    required List<String> availableRegions,
+    required List<String> mainStyles,
+  }) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      debugPrint('=== AuthProvider.registerBusinessInfo 시작 ===');
+      final response = await _authService.registerBusinessInfo(
+        businessName: businessName,
+        businessNumber: businessNumber,
+        businessCertificate: businessCertificate,
+        licenseCertificate: licenseCertificate,
+        safetyEducationCertificate: safetyEducationCertificate,
+        address: address,
+        addressDetail: addressDetail,
+        contactPhonePublic: contactPhonePublic,
+        availableRegions: availableRegions,
+        mainStyles: mainStyles,
+      );
+      
+      _setLoading(false);
+
+      if (!response.success) {
+        debugPrint('사업자 추가정보 등록 실패: ${response.message}');
+        _setError(response.message);
+        return {
+          'success': false,
+          'message': response.message,
+        };
+      }
+
+      debugPrint('=== 사업자 추가정보 등록 성공 ===');
+      return {
+        'success': true,
+        'message': response.message ?? '사업자 정보가 등록되었습니다.',
+      };
+    } catch (e) {
+      _setLoading(false);
+      debugPrint('사업자 추가정보 등록 예외 발생: $e');
+      final errorMessage = '사업자 추가정보 등록 중 오류가 발생했습니다.';
+      _setError(errorMessage);
+      return {
+        'success': false,
+        'message': errorMessage,
+      };
+    }
+  }
+
+  // 피드 리스트 가져오기
+  Future<ApiResponse<FeedListResponse>> getFeedList() async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      debugPrint('=== AuthProvider.getFeedList 시작 ===');
+      final response = await _authService.getFeedList();
+      _setLoading(false);
+
+      if (!response.success) {
+        debugPrint('피드 리스트 가져오기 실패: ${response.message}');
+        _setError(response.message);
+        return response;
+      }
+
+      debugPrint('=== 피드 리스트 가져오기 성공 ===');
+      debugPrint('피드 개수: ${response.data?.portfolios.length ?? 0}');
+      return response;
+    } catch (e) {
+      _setLoading(false);
+      debugPrint('피드 리스트 호출 예외 발생: $e');
+      final errorMessage = '피드 리스트 호출에 실패하였습니다. 잠시 후 다시 시도해 주세요.';
+      _setError(errorMessage);
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    }
   }
 }
 

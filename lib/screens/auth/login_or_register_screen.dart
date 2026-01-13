@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/custom_text_button.dart';
 import 'phone_input_screen.dart';
+import 'terms_agreement_screen.dart';
 
 class LoginOrRegisterScreen extends StatelessWidget {
   const LoginOrRegisterScreen({super.key});
@@ -43,8 +44,8 @@ class LoginOrRegisterScreen extends StatelessWidget {
               CustomTextButton(
                 text: 'LOGIN',
                 fontSize: 15,
-                textColor: const Color(0xFFFFFFFF),
-                backgroundColor: Colors.grey.shade700,
+                textColor: Theme.of(context).colorScheme.onPrimary,
+                backgroundColor: Theme.of(context).colorScheme.surface,
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -59,14 +60,13 @@ class LoginOrRegisterScreen extends StatelessWidget {
               CustomTextButton(
                 text: 'JOIN',
                 fontSize: 15,
-                textColor: const Color(0xFFFFFFFF),
-                backgroundColor: Colors.grey.shade700,
+                textColor: Theme.of(context).colorScheme.onPrimary,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                      const PhoneInputScreen(isRegister: true),
+                      builder: (context) => const TermsAgreementScreen(),
                     ),
                   );
                 },

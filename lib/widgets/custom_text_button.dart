@@ -94,7 +94,7 @@ class CustomTextButton extends StatelessWidget {
           onPressed: onPressed,
           style: TextButton.styleFrom(
             backgroundColor: Colors.transparent,
-            foregroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
             padding: padding ?? const EdgeInsets.symmetric(vertical: 17, horizontal: 16),
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,

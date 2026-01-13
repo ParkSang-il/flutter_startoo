@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/api_config.dart';
 
@@ -31,18 +32,37 @@ class ApiClient {
       onError: (error, handler) async {
         // 401 에러 시 토큰 리프레시 시도
         if (error.response?.statusCode == 401) {
-          try {
-            final refreshed = await _refreshToken();
-            if (refreshed) {
-              // 재시도
-              final token = await _storage.read(key: 'access_token');
-              error.requestOptions.headers['Authorization'] = 'Bearer $token';
-              final response = await _dio.fetch(error.requestOptions);
-              return handler.resolve(response);
-            }
-          } catch (e) {
-            // 리프레시 실패 시 로그아웃 처리
+          debugPrint('=== 인터셉터: 401 에러 감지 - 토큰 리프레시 시도 ===');
+          
+          // 리프레시 요청 자체인 경우 무한 루프 방지
+          if (error.requestOptions.path == '/auth/refresh') {
+            debugPrint('=== 인터셉터: 리프레시 요청 자체가 401 - 토큰 삭제 및 에러 전달 ===');
             await _storage.deleteAll();
+            return handler.next(error);
+          }
+          
+          // 토큰 리프레시 시도
+          final refreshed = await _refreshToken();
+          
+          if (refreshed) {
+            debugPrint('=== 인터셉터: 토큰 리프레시 성공 - 원래 요청 재시도 ===');
+            // 리프레시 성공 시 원래 요청 재시도
+            final token = await _storage.read(key: 'access_token');
+            if (token != null) {
+              error.requestOptions.headers['Authorization'] = 'Bearer $token';
+              try {
+                final response = await _dio.fetch(error.requestOptions);
+                debugPrint('=== 인터셉터: 재시도 성공 ===');
+                return handler.resolve(response);
+              } catch (e) {
+                debugPrint('=== 인터셉터: 재시도 실패: $e ===');
+                return handler.next(error);
+              }
+            }
+          } else {
+            debugPrint('=== 인터셉터: 토큰 리프레시 실패 - 토큰 삭제 및 에러 전달 ===');
+            // 리프레시 실패 시 토큰 삭제 (이미 _refreshToken에서 삭제됨)
+            // 에러 전달하여 호출하는 쪽에서 로그인 화면으로 이동하도록 함
           }
         }
         return handler.next(error);
@@ -69,8 +89,12 @@ class ApiClient {
           return true;
         }
       }
+      // 리프레시 실패 시 토큰 삭제
+      await _storage.deleteAll();
       return false;
     } catch (e) {
+      // 리프레시 예외 발생 시 토큰 삭제
+      await _storage.deleteAll();
       return false;
     }
   }

@@ -22,11 +22,38 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   bool _isLoading = false;
+  bool _isPhoneValid = false;  // 휴대폰 번호 유효성 상태
+
+  @override
+  void initState() {
+    super.initState();
+    // 입력값 변경 감지
+    _phoneController.addListener(_validatePhone);
+  }
 
   @override
   void dispose() {
+    _phoneController.removeListener(_validatePhone);
     _phoneController.dispose();
     super.dispose();
+  }
+
+  // 휴대폰 번호 유효성 검사
+  void _validatePhone() {
+    final value = _phoneController.text;
+    if (value.isEmpty) {
+      setState(() {
+        _isPhoneValid = false;
+      });
+      return;
+    }
+
+    final digits = PhoneFormatter.extractDigits(value);
+    final isValid = PhoneFormatter.isValid(digits);
+
+    setState(() {
+      _isPhoneValid = isValid;
+    });
   }
 
   Future<void> _sendVerificationCode() async {
@@ -77,7 +104,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(
-          color: Theme.of(context).colorScheme.primary
+          color: Theme.of(context).colorScheme.onSurface
         ),
       ),
       body: SafeArea(
@@ -119,6 +146,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                     LengthLimitingTextInputFormatter(11),
                     _PhoneInputFormatter(),
                   ],
+                  cursorColor: Theme.of(context).colorScheme.onPrimary,
                   decoration: InputDecoration(
                     labelText: '휴대폰 번호',
                     hintText: '010-1234-5678',
@@ -134,7 +162,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                     ),
                     focusedBorder: UnderlineInputBorder(
                       borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.primary,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         width: 2,
                       ),
                     ),
@@ -159,33 +187,47 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                 const SizedBox(height: 32),
                 // 인증번호 받기 버튼
                 TextButton(
-                  onPressed: _isLoading ? null : _sendVerificationCode,
+                  onPressed: (_isLoading || !_isPhoneValid) ? null : _sendVerificationCode,
                   style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: _isPhoneValid && !_isLoading
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey.shade800,  // 비활성화 시 어두운 색상
+                    foregroundColor: _isPhoneValid && !_isLoading
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Colors.grey.shade600,  // 비활성화 시 어두운 텍스트 색상
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
+                    disabledBackgroundColor: Colors.grey.shade800,  // 비활성화 배경색
+                    disabledForegroundColor: Colors.grey.shade600,  // 비활성화 텍스트 색상
                   ),
                   child: _isLoading
                       ? SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        )
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  )
                       : const Text(
-                          '인증번호 받기',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
+                    '인증번호 받기',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                      shadows: [
+                        Shadow(
+                          blurRadius: 1,              // 그림자의 퍼짐 정도
+                          color: Colors.black87, // 그림자 색상
+                          offset: Offset(0.3, 0.3),      // 그림자의 위치 (x, y)
                         ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 // 안내 문구

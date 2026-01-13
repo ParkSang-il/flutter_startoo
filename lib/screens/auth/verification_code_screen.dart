@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/snackbar_helper.dart';
 import 'user_type_selection_screen.dart';
+import '../../screens/feed/feed_list_screen.dart';
 
 class VerificationCodeScreen extends StatefulWidget {
   final String phone;
@@ -109,13 +110,8 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
           Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
         }
       } else {
-        // 회원가입 플로우인 경우 - 회원 타입 선택 화면으로 이동
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => UserTypeSelectionScreen(phone: widget.phone),
-          ),
-        );
+        // 회원가입 플로우인 경우 - 바로 회원가입 API 호출 (일반회원으로)
+        await _registerAfterVerification(context, widget.phone);
       }
     } else {
       // 에러 메시지 확인
@@ -133,12 +129,12 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
       // 에러 메시지 표시
       SnackBarHelper.showError(context, errorMessage);
 
-      // 회원가입 플로우에서 "이미 가입된 번호입니다" 에러인 경우 뒤로가기
+      // 회원가입 플로우에서 "이미 가입된 번호입니다" 에러인 경우 맨 처음 화면으로 이동
       if (widget.isRegister && errorMessage.contains('이미 가입된 번호입니다')) {
-        // 에러 메시지 표시 후 잠시 대기한 뒤 뒤로가기
+        // 에러 메시지 표시 후 잠시 대기한 뒤 맨 처음 화면으로 이동
         await Future.delayed(const Duration(milliseconds: 500));
         if (mounted) {
-          Navigator.of(context).pop();
+          Navigator.of(context).popUntil((route) => route.isFirst);
         }
         return;
       }
@@ -186,6 +182,47 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
     }
   }
 
+  // 회원가입 인증 후 바로 회원가입 처리
+  Future<void> _registerAfterVerification(BuildContext context, String phone) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // 로딩 표시
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    // 일반회원으로 바로 회원가입 API 호출
+    final success = await authProvider.register(
+      phone: phone,
+      userType: 1, // 일반 회원
+      nickname: null, // 닉네임 없이
+    );
+
+    if (!context.mounted) return;
+    
+    // 로딩 닫기
+    Navigator.of(context).pop();
+
+    if (success) {
+      // 회원가입 성공 - 사업자 여부 확인 화면으로 이동
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => UserTypeSelectionScreen(),
+        ),
+      );
+    } else {
+      // 회원가입 실패 - 에러 메시지 표시
+      SnackBarHelper.showError(
+        context,
+        authProvider.errorMessage ?? '회원가입에 실패했습니다.',
+      );
+    }
+  }
+
   String _formatTime(int seconds) {
     final minutes = seconds ~/ 60;
     final secs = seconds % 60;
@@ -200,7 +237,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(
-            color: Theme.of(context).colorScheme.primary
+            color: Theme.of(context).colorScheme.onSurface
         ),
       ),
       body: SafeArea(
@@ -243,6 +280,8 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
                       maxLines: null,
                       minLines: null,
                       textAlignVertical: TextAlignVertical.center,
+                      cursorHeight: 25,
+                      cursorColor: Theme.of(context).colorScheme.onPrimary,
                       controller: _controllers[index],
                       focusNode: _focusNodes[index],
                       textAlign: TextAlign.center,
@@ -254,10 +293,9 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
                       style: TextStyle(
                         fontSize: 29,
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: Theme.of(context).colorScheme.onPrimary,
                       ),
                       decoration: InputDecoration(
-
                         contentPadding: const EdgeInsets.symmetric(
                           vertical: 0,
                           horizontal: 11,
@@ -277,7 +315,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
+                            color: Theme.of(context).colorScheme.onPrimary,
                             width: 2,
                           ),
                         ),
@@ -310,7 +348,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),

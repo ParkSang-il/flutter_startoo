@@ -4,6 +4,7 @@ enum SnackBarType {
   error,
   success,
   info,
+  success2,
 }
 
 class CustomSnackBar extends SnackBar {
@@ -54,6 +55,8 @@ class CustomSnackBar extends SnackBar {
         return Icons.check_circle_outline;
       case SnackBarType.info:
         return Icons.info_outline;
+      case SnackBarType.success2:
+        return Icons.check_circle_outline;
     }
   }
 
@@ -66,6 +69,8 @@ class CustomSnackBar extends SnackBar {
         return Colors.green;
       case SnackBarType.info:
         return Colors.blue;
+      case SnackBarType.success2:
+        return Colors.green;
     }
   }
 
@@ -78,6 +83,8 @@ class CustomSnackBar extends SnackBar {
         return const Duration(seconds: 2);
       case SnackBarType.info:
         return const Duration(seconds: 3);
+      case SnackBarType.success2:
+        return const Duration(seconds: 10);
     }
   }
 }

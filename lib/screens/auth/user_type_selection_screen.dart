@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../screens/feed/feed_list_screen.dart';
 import 'register_screen.dart';
 
 class UserTypeSelectionScreen extends StatelessWidget {
-  final String phone;
-
-  const UserTypeSelectionScreen({
-    super.key,
-    required this.phone,
-  });
+  const UserTypeSelectionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -18,16 +12,6 @@ class UserTypeSelectionScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            '뒤로',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontSize: 16,
-            ),
-          ),
-        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -48,140 +32,83 @@ class UserTypeSelectionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                '회원 유형을 선택해주세요',
+                '사업자이시면 추가 정보를 입력해주세요',
                 style: TextStyle(
                   fontSize: 16,
                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                 ),
               ),
               const SizedBox(height: 64),
-              // 일반 회원 버튼
-              _UserTypeCard(
-                title: '일반 회원',
-                description: '타투를 받고 싶은 고객',
-                icon: Icons.person,
-                onTap: () {
-                  Navigator.push(
-                    context,
+              // 아니오 버튼 (일반 회원 - 피드리스트로 이동)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
-                      builder: (context) => RegisterScreen(
-                        phone: phone,
-                        userType: 1, // 일반 회원
-                      ),
+                      builder: (context) => const FeedListPage(),
                     ),
                   );
                 },
+                style: ElevatedButton.styleFrom(
+                  elevation: 0,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  '아니오',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 1,              // 그림자의 퍼짐 정도
+                        color: Colors.black87, // 그림자 색상
+                        offset: Offset(0.3, 0.3),      // 그림자의 위치 (x, y)
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              // 사업자 버튼
-              _UserTypeCard(
-                title: '사업자 (타투이스트/샵)',
-                description: '포트폴리오를 올리고 예약을 받는 아티스트',
-                icon: Icons.business,
-                onTap: () {
+              // 예 버튼 (사업자 - 추가정보 입력 화면으로 이동)
+              ElevatedButton(
+                onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => RegisterScreen(
-                        phone: phone,
-                        userType: 2, // 사업자
-                      ),
+                      builder: (context) => const RegisterScreen(),
                     ),
                   );
                 },
-                isBusiness: true,
+                style: ElevatedButton.styleFrom(
+                  elevation: 0,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  '예',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 1,              // 그림자의 퍼짐 정도
+                        color: Colors.black87, // 그림자 색상
+                        offset: Offset(0.3, 0.3),      // 그림자의 위치 (x, y)
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _UserTypeCard extends StatelessWidget {
-  final String title;
-  final String description;
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool isBusiness;
-
-  const _UserTypeCard({
-    required this.title,
-    required this.description,
-    required this.icon,
-    required this.onTap,
-    this.isBusiness = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: isBusiness
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.outline.withOpacity(0.2),
-            width: isBusiness ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          color: isBusiness
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-              : Colors.transparent,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: isBusiness
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: isBusiness
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-            ),
-          ],
         ),
       ),
     );

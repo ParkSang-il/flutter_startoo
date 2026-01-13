@@ -48,6 +48,29 @@ dependencies:
   intl: ^0.19.0
 
   flutter_native_splash: ^2.3.0
+  
+  # 이미지 선택
+  image_picker: ^1.0.7
+  
+  # 암호화 (AWS Signature V4)
+  crypto: ^3.0.3
+  
+  # 파일 경로 처리
+  path: ^1.8.3
+  
+  # HTTP 파싱
+  http_parser: ^4.0.2
+
+  #스켈레톤 UI
+  shimmer: ^3.0.0
+
+  #이미지 스크롤(자동재생,무한스크롤, 애니메이션)
+  carousel_slider: ^5.0.0 # 최신 버전 확인 필요
+
+  # FontAwesome 아이콘
+  font_awesome_flutter: ^10.7.0
+
+  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -75,6 +98,7 @@ flutter:
   assets:
     - assets/images/
     - assets/
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

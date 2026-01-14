@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:starttoo/screens/feed/widgets/feed_item_skeleton.dart';
 import 'model/FeedModel.dart';
@@ -11,6 +12,7 @@ import '../search_screen.dart';
 import '../create_screen.dart';
 import '../activity_screen.dart';
 import '../profile_screen.dart';
+import 'controllers/feed_list_controller.dart';
 
 class FeedListPage extends StatefulWidget {
   const FeedListPage({super.key});
@@ -20,24 +22,69 @@ class FeedListPage extends StatefulWidget {
 }
 
 class _FeedListPageState extends State<FeedListPage> {
-  bool _isLoading = true;  // 로딩 상태
-  List<Portfolio> _portfolios = [];  // 포트폴리오 리스트
   int _currentIndex = 0;  // bottom navigation 현재 인덱스
+  late FeedListController _feedController;
 
   @override
   void initState() {
     super.initState();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    _feedController = FeedListController(authProvider);
+    _feedController.addListener(_onFeedControllerUpdate);
     // 빌드가 완료된 후에 실행되도록 함
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_currentIndex == 0) {
-        _loadFeedList();
+        _feedController.loadFeedList(reset: true);
       }
     });
   }
 
+  @override
+  void dispose() {
+    _feedController.removeListener(_onFeedControllerUpdate);
+    _feedController.dispose();
+    super.dispose();
+  }
+
+  void _onFeedControllerUpdate() {
+    if (mounted) {
+      setState(() {});
+      
+      // 에러 메시지 표시
+      if (_feedController.errorMessage != null && _feedController.errorMessage!.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_feedController.errorMessage!),
+            backgroundColor: Colors.red,
+          ),
+        );
+        _feedController.clearError();
+      }
+    }
+  }
+
   void _onTabTapped(int index) {
-    setState(() {
-      _currentIndex = index;
+    if (index == 2) {
+      // 등록 화면은 모달로 표시
+      _showCreateModal();
+    } else {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+  }
+
+  void _showCreateModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // 전체 화면 사용 가능
+      backgroundColor: Colors.transparent,
+      builder: (context) => const CreateScreen(),
+    ).then((_) {
+      // 모달이 닫힌 후 피드 리스트 새로고침
+      if (_currentIndex == 0) {
+        _feedController.loadFeedList(reset: true);
+      }
     });
   }
 
@@ -48,7 +95,8 @@ class _FeedListPageState extends State<FeedListPage> {
       case 1:
         return const SearchScreen();
       case 2:
-        return const CreateScreen();
+        // 등록 화면은 모달로 표시되므로 여기서는 피드 리스트 표시
+        return _buildFeedList();
       case 3:
         return const ActivityScreen();
       case 4:
@@ -63,9 +111,18 @@ class _FeedListPageState extends State<FeedListPage> {
     final double statusBarHeight = MediaQuery.of(context).padding.top;
     const double contentHeight = 20.0;
 
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _feedController.loadFeedList(reset: true);
+      },
+      color: Theme.of(context).colorScheme.onSurface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      child: CustomScrollView(
+        controller: _feedController.scrollController,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        slivers: [
         SliverAppBar(
           floating: true,
           snap: true,
@@ -137,71 +194,60 @@ class _FeedListPageState extends State<FeedListPage> {
         SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, index) {
-              if (_isLoading) {
+              // 초기 로딩 중
+              if (_feedController.isLoading && index == 0) {
                 return const FeedItemSkeleton();
-              } else {
-                if (index >= _portfolios.length) {
-                  return const SizedBox.shrink();
-                }
-                final portfolio = _portfolios[index];
-                final sortedImages = List<PortfolioImage>.from(portfolio.images)
-                  ..sort((a, b) => a.imageOrder.compareTo(b.imageOrder));
-                final imageUrls = sortedImages
-                    .map((img) => img.imageUrl)
-                    .toList();
-                
-                final feed = FeedModel(
-                  username: portfolio.user.username,
-                  userImage: portfolio.user.profileImage.isNotEmpty
-                      ? portfolio.user.profileImage
-                      : 'https://via.placeholder.com/200',
-                  userType: portfolio.user.userType,
-                  postImage: portfolio.firstImageUrl.isNotEmpty
-                      ? portfolio.firstImageUrl
-                      : 'https://via.placeholder.com/600',
-                  postImages: imageUrls.isNotEmpty
-                      ? imageUrls
-                      : ['https://via.placeholder.com/600'],
-                  caption: portfolio.description,
-                  likes: portfolio.likesCount,
-                  timeAgo: portfolio.timeAgo,
-                  businessName: portfolio.business.businessName
-                );
-                return FeedItem(feed: feed);
               }
+              
+              // 로딩 중이 아니고 인덱스가 범위를 벗어나면 빈 위젯
+              if (index >= _feedController.portfolios.length) {
+                // 추가 로딩 중일 때 로딩 인디케이터 표시
+                if (_feedController.isLoadingMore) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }
+              
+              final portfolio = _feedController.portfolios[index];
+              final sortedImages = List<PortfolioImage>.from(portfolio.images)
+                ..sort((a, b) => a.imageOrder.compareTo(b.imageOrder));
+              final imageUrls = sortedImages
+                  .map((img) => img.imageUrl)
+                  .toList();
+              
+              final feed = FeedModel(
+                portfolioId: portfolio.id,
+                username: portfolio.user.username,
+                userImage: portfolio.user.profileImage,
+                userType: portfolio.user.userType,
+                postImage: portfolio.firstImageUrl,
+                postImages: imageUrls.isNotEmpty
+                    ? imageUrls
+                    : [],
+                caption: portfolio.description,
+                likes: portfolio.likesCount,
+                comments: portfolio.commentsCount,
+                timeAgo: portfolio.timeAgo,
+                businessName: portfolio.business.businessName,
+                isLiked: portfolio.isLiked,
+              );
+              return FeedItem(feed: feed);
             },
-            childCount: _isLoading ? 10 : _portfolios.length,
+            childCount: _feedController.isLoading 
+                ? 10 
+                : _feedController.portfolios.length + (_feedController.isLoadingMore ? 1 : 0),
           ),
         ),
       ],
+      ),
     );
   }
 
-  // 피드 리스트 로드
-  Future<void> _loadFeedList() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final response = await authProvider.getFeedList();
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        if (response.success && response.data != null) {
-          _portfolios = response.data!.portfolios;
-        } else {
-          // 에러 발생 시 빈 리스트
-          _portfolios = [];
-          if (response.message.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(response.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

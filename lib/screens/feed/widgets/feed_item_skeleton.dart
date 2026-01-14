@@ -7,172 +7,74 @@ class FeedItemSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 헤더 스켈레톤
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 좌측 라인 스켈레톤
+            Column(
+              children: [
+                _shimmer(CircleAvatar(radius: 20, backgroundColor: Colors.grey.shade800)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Container(width: 2, color: Colors.grey.shade800),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+
+            // 우측 콘텐츠 스켈레톤
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Shimmer.fromColors(
-                    baseColor: Colors.grey.shade800,
-                    highlightColor: Colors.grey.shade700,
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Colors.grey.shade800,
+                  Row(
+                    children: [
+                      _shimmer(Container(width: 80, height: 14, color: Colors.white)),
+                      const SizedBox(width: 8),
+                      _shimmer(Container(width: 40, height: 12, color: Colors.white)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _shimmer(Container(width: double.infinity, height: 14, color: Colors.white)),
+                  const SizedBox(height: 6),
+                  _shimmer(Container(width: 200, height: 14, color: Colors.white)),
+                  const SizedBox(height: 12),
+                  _shimmer(
+                    Container(
+                      width: double.infinity,
+                      height: 200,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Shimmer.fromColors(
-                    baseColor: Colors.grey.shade800,
-                    highlightColor: Colors.grey.shade700,
-                    child: Container(
-                      width: 100,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade800,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: List.generate(4, (index) =>
+                        Padding(
+                          padding: const EdgeInsets.only(right: 16.0),
+                          child: _shimmer(const Icon(Icons.circle, size: 22)),
+                        ),
                     ),
                   ),
                 ],
               ),
-              Shimmer.fromColors(
-                baseColor: Colors.grey.shade800,
-                highlightColor: Colors.grey.shade700,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade800,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 이미지 스켈레톤
-        AspectRatio(
-          aspectRatio: 1,
-          child: Shimmer.fromColors(
-            baseColor: Colors.grey.shade800,
-            highlightColor: Colors.grey.shade700,
-            child: Container(
-              width: double.infinity,
-              color: Colors.grey.shade800,
             ),
-          ),
+          ],
         ),
+      ),
+    );
+  }
 
-        // 액션 버튼 스켈레톤
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: List.generate(3, (index) =>
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: Shimmer.fromColors(
-                        baseColor: Colors.grey.shade800,
-                        highlightColor: Colors.grey.shade700,
-                        child: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade800,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    ),
-                ),
-              ),
-              Shimmer.fromColors(
-                baseColor: Colors.grey.shade800,
-                highlightColor: Colors.grey.shade700,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade800,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 텍스트 스켈레톤
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Shimmer.fromColors(
-                baseColor: Colors.grey.shade800,
-                highlightColor: Colors.grey.shade700,
-                child: Container(
-                  width: 120,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade800,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Shimmer.fromColors(
-                baseColor: Colors.grey.shade800,
-                highlightColor: Colors.grey.shade700,
-                child: Container(
-                  width: double.infinity,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade800,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Shimmer.fromColors(
-                baseColor: Colors.grey.shade800,
-                highlightColor: Colors.grey.shade700,
-                child: Container(
-                  width: 200,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade800,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Shimmer.fromColors(
-                baseColor: Colors.grey.shade800,
-                highlightColor: Colors.grey.shade700,
-                child: Container(
-                  width: 80,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade800,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ],
+  Widget _shimmer(Widget child) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade800,
+      highlightColor: Colors.grey.shade700,
+      child: child,
     );
   }
 }

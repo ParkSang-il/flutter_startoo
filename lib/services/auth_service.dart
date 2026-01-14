@@ -4,6 +4,8 @@ import '../models/auth_response.dart';
 import '../models/api_response.dart';
 import '../models/phone_check_response.dart';
 import '../models/portfolio_model.dart';
+import '../models/like_response.dart';
+import '../models/comment_model.dart';
 import '../utils/api_client.dart';
 
 class AuthService {
@@ -549,13 +551,16 @@ class AuthService {
   }
 
   // 피드 리스트 가져오기
-  Future<ApiResponse<FeedListResponse>> getFeedList() async {
+  Future<ApiResponse<FeedListResponse>> getFeedList({int page = 1, int perPage = 2}) async {
     try {
       debugPrint('=== 피드 리스트 API 요청 ===');
-      debugPrint('URL: ${ApiClient.baseUrl}/portfolios');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios?page=$page&per_page=$perPage');
       debugPrint('Method: GET');
 
-      final response = await _apiClient.dio.get('/portfolios');
+      final response = await _apiClient.dio.get('/portfolios', queryParameters: {
+        'page': page,
+        'per_page': perPage,
+      });
 
       debugPrint('=== 피드 리스트 API 응답 ===');
       debugPrint('Status Code: ${response.statusCode}');
@@ -585,6 +590,519 @@ class AuthService {
       );
     } catch (e) {
       debugPrint('피드 리스트 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 포트폴리오 생성
+  Future<ApiResponse<void>> createPortfolio({
+    required String title,
+    required String description,
+    required String workDate,
+    required int price,
+    required bool isPublic,
+    required List<Map<String, dynamic>> images,
+    required List<String> tags,
+  }) async {
+    try {
+      debugPrint('=== 포트폴리오 생성 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios');
+      debugPrint('Method: POST');
+
+      final requestData = {
+        'title': title,
+        'description': description,
+        'work_date': workDate,
+        'price': price,
+        'is_public': isPublic,
+        'images': images,
+        'tags': tags,
+      };
+
+      debugPrint('Body: $requestData');
+
+      final response = await _apiClient.dio.post(
+        '/portfolios',
+        data: requestData,
+      );
+
+      debugPrint('=== 포트폴리오 생성 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return ApiResponse(
+          success: true,
+          message: '포트폴리오가 성공적으로 생성되었습니다.',
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '포트폴리오 생성에 실패했습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('포트폴리오 생성 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      // 422 에러의 경우 errors 필드에서 상세 메시지 추출
+      String errorMessage = '포트폴리오 생성에 실패했습니다.';
+      if (e.response?.statusCode == 422 && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data['errors'] != null && data['errors'] is Map) {
+          final errors = data['errors'] as Map<String, dynamic>;
+          // 첫 번째 에러 메시지 사용
+          if (errors.isNotEmpty) {
+            final firstError = errors.values.first;
+            if (firstError is List && firstError.isNotEmpty) {
+              errorMessage = firstError[0].toString();
+            } else if (firstError is String) {
+              errorMessage = firstError;
+            }
+          }
+        } else if (data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      } else if (e.response?.data['message'] != null) {
+        errorMessage = e.response!.data['message'].toString();
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('포트폴리오 생성 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 포트폴리오 좋아요 추가
+  Future<ApiResponse<LikeResponse>> addLike(int portfolioId) async {
+    try {
+      debugPrint('=== 좋아요 추가 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/like');
+      debugPrint('Method: POST');
+
+      final response = await _apiClient.dio.post(
+        '/portfolios/$portfolioId/like',
+      );
+
+      debugPrint('=== 좋아요 추가 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        return ApiResponse.fromJson(
+          response.data,
+          (data) => LikeResponse.fromJson(data as Map<String, dynamic>),
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('좋아요 추가 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      String errorMessage = '좋아요 추가에 실패했습니다.';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('좋아요 추가 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 포트폴리오 좋아요 취소
+  Future<ApiResponse<LikeResponse>> removeLike(int portfolioId) async {
+    try {
+      debugPrint('=== 좋아요 취소 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/like');
+      debugPrint('Method: DELETE');
+
+      final response = await _apiClient.dio.delete(
+        '/portfolios/$portfolioId/like',
+      );
+
+      debugPrint('=== 좋아요 취소 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        return ApiResponse.fromJson(
+          response.data,
+          (data) => LikeResponse.fromJson(data as Map<String, dynamic>),
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('좋아요 취소 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      String errorMessage = '좋아요 취소에 실패했습니다.';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('좋아요 취소 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 포트폴리오 좋아요 토글 (기존 호환성 유지)
+  Future<ApiResponse<LikeResponse>> toggleLike(int portfolioId, bool currentLikeStatus) async {
+    if (currentLikeStatus) {
+      return await removeLike(portfolioId);
+    } else {
+      return await addLike(portfolioId      );
+    }
+  }
+
+  // 포트폴리오 댓글 목록 조회 (상위 댓글만)
+  Future<ApiResponse<CommentListResponse>> getComments(int portfolioId, {int perPage = 15}) async {
+    try {
+      debugPrint('=== 댓글 목록 조회 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/comments');
+      debugPrint('Method: GET');
+
+      final response = await _apiClient.dio.get(
+        '/portfolios/$portfolioId/comments',
+        queryParameters: {'per_page': perPage},
+      );
+
+      debugPrint('=== 댓글 목록 조회 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        return ApiResponse.fromJson(
+          response.data,
+          (data) => CommentListResponse.fromJson(data as Map<String, dynamic>),
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('댓글 목록 조회 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      String errorMessage = '댓글 목록을 불러오는데 실패했습니다.';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('댓글 목록 조회 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 대댓글 목록 조회
+  Future<ApiResponse<ReplyListResponse>> getReplies(int portfolioId, int commentId, {int perPage = 20}) async {
+    try {
+      debugPrint('=== 대댓글 목록 조회 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/comments/$commentId/replies');
+      debugPrint('Method: GET');
+
+      final response = await _apiClient.dio.get(
+        '/portfolios/$portfolioId/comments/$commentId/replies',
+        queryParameters: {'per_page': perPage},
+      );
+
+      debugPrint('=== 대댓글 목록 조회 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        return ApiResponse.fromJson(
+          response.data,
+          (data) => ReplyListResponse.fromJson(data as Map<String, dynamic>),
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('대댓글 목록 조회 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      String errorMessage = '대댓글 목록을 불러오는데 실패했습니다.';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('대댓글 목록 조회 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 댓글 작성
+  Future<ApiResponse<Comment>> createComment(int portfolioId, String content, {int? parentId}) async {
+    try {
+      debugPrint('=== 댓글 작성 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/comments');
+      debugPrint('Method: POST');
+
+      final requestData = {
+        'content': content,
+        if (parentId != null) 'parent_id': parentId,
+      };
+
+      final response = await _apiClient.dio.post(
+        '/portfolios/$portfolioId/comments',
+        data: requestData,
+      );
+
+      debugPrint('=== 댓글 작성 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        return ApiResponse.fromJson(
+          data,
+          (commentData) => Comment.fromJson(commentData['comment'] as Map<String, dynamic>),
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('댓글 작성 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      String errorMessage = '댓글 작성에 실패했습니다.';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('댓글 작성 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 댓글 수정
+  Future<ApiResponse<Comment>> updateComment(int portfolioId, int commentId, String content) async {
+    try {
+      debugPrint('=== 댓글 수정 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/comments/$commentId');
+      debugPrint('Method: PUT');
+
+      final response = await _apiClient.dio.put(
+        '/portfolios/$portfolioId/comments/$commentId',
+        data: {'content': content},
+      );
+
+      debugPrint('=== 댓글 수정 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        return ApiResponse.fromJson(
+          data,
+          (commentData) => Comment.fromJson(commentData['comment'] as Map<String, dynamic>),
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('댓글 수정 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      String errorMessage = '댓글 수정에 실패했습니다.';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('댓글 수정 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 댓글 삭제
+  Future<ApiResponse<void>> deleteComment(int portfolioId, int commentId) async {
+    try {
+      debugPrint('=== 댓글 삭제 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/comments/$commentId');
+      debugPrint('Method: DELETE');
+
+      final response = await _apiClient.dio.delete(
+        '/portfolios/$portfolioId/comments/$commentId',
+      );
+
+      debugPrint('=== 댓글 삭제 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        return ApiResponse.fromJson(response.data, null);
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('댓글 삭제 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      String errorMessage = '댓글 삭제에 실패했습니다.';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('댓글 삭제 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 댓글 고정/해제
+  Future<ApiResponse<Comment>> pinComment(int portfolioId, int commentId, bool isPinned) async {
+    try {
+      debugPrint('=== 댓글 고정/해제 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/comments/$commentId/pin');
+      debugPrint('Method: POST');
+
+      final response = await _apiClient.dio.post(
+        '/portfolios/$portfolioId/comments/$commentId/pin',
+        data: {'is_pinned': isPinned},
+      );
+
+      debugPrint('=== 댓글 고정/해제 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        return ApiResponse.fromJson(
+          data,
+          (commentData) => Comment.fromJson(commentData['comment'] as Map<String, dynamic>),
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('댓글 고정/해제 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      String errorMessage = '댓글 고정/해제에 실패했습니다.';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('댓글 고정/해제 예상치 못한 에러: $e');
       return ApiResponse(
         success: false,
         message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',

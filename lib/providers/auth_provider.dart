@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import '../models/auth_response.dart';
 import '../models/api_response.dart';
 import '../models/portfolio_model.dart';
+import '../models/like_response.dart';
+import '../models/comment_model.dart';
 import '../services/auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -323,13 +325,13 @@ class AuthProvider with ChangeNotifier {
   }
 
   // 피드 리스트 가져오기
-  Future<ApiResponse<FeedListResponse>> getFeedList() async {
+  Future<ApiResponse<FeedListResponse>> getFeedList({int page = 1, int perPage = 2}) async {
     _setLoading(true);
     _setError(null);
 
     try {
       debugPrint('=== AuthProvider.getFeedList 시작 ===');
-      final response = await _authService.getFeedList();
+      final response = await _authService.getFeedList(page: page, perPage: perPage);
       _setLoading(false);
 
       if (!response.success) {
@@ -351,6 +353,51 @@ class AuthProvider with ChangeNotifier {
         message: errorMessage,
       );
     }
+  }
+
+  // 포트폴리오 좋아요 추가
+  Future<ApiResponse<LikeResponse>> addLike(int portfolioId) async {
+    return await _authService.addLike(portfolioId);
+  }
+
+  // 포트폴리오 좋아요 취소
+  Future<ApiResponse<LikeResponse>> removeLike(int portfolioId) async {
+    return await _authService.removeLike(portfolioId);
+  }
+
+  // 포트폴리오 좋아요 토글 (기존 호환성 유지)
+  Future<ApiResponse<LikeResponse>> toggleLike(int portfolioId, bool currentLikeStatus) async {
+    return await _authService.toggleLike(portfolioId, currentLikeStatus);
+  }
+
+  // 댓글 목록 조회
+  Future<ApiResponse<CommentListResponse>> getComments(int portfolioId, {int perPage = 15}) async {
+    return await _authService.getComments(portfolioId, perPage: perPage);
+  }
+
+  // 대댓글 목록 조회
+  Future<ApiResponse<ReplyListResponse>> getReplies(int portfolioId, int commentId, {int perPage = 20}) async {
+    return await _authService.getReplies(portfolioId, commentId, perPage: perPage);
+  }
+
+  // 댓글 작성
+  Future<ApiResponse<Comment>> createComment(int portfolioId, String content, {int? parentId}) async {
+    return await _authService.createComment(portfolioId, content, parentId: parentId);
+  }
+
+  // 댓글 수정
+  Future<ApiResponse<Comment>> updateComment(int portfolioId, int commentId, String content) async {
+    return await _authService.updateComment(portfolioId, commentId, content);
+  }
+
+  // 댓글 삭제
+  Future<ApiResponse<void>> deleteComment(int portfolioId, int commentId) async {
+    return await _authService.deleteComment(portfolioId, commentId);
+  }
+
+  // 댓글 고정/해제
+  Future<ApiResponse<Comment>> pinComment(int portfolioId, int commentId, bool isPinned) async {
+    return await _authService.pinComment(portfolioId, commentId, isPinned);
   }
 }
 

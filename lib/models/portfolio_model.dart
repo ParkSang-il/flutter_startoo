@@ -113,6 +113,7 @@ class Portfolio {
   final List<PortfolioTag> tags;
   final PortfolioUser user;
   final PortfolioBusiness business;
+  final bool isLiked;
 
   Portfolio({
     required this.id,
@@ -133,6 +134,7 @@ class Portfolio {
     required this.tags,
     required this.user,
     required this.business,
+    this.isLiked = false,
   });
 
   factory Portfolio.fromJson(Map<String, dynamic> json) {
@@ -162,6 +164,7 @@ class Portfolio {
           [],
       user: PortfolioUser.fromJson(json['user'] as Map<String, dynamic>),
       business: PortfolioBusiness.fromJson(json['business_verification'] as Map<String, dynamic>),
+      isLiked: json['is_liked'] ?? false,
     );
   }
 

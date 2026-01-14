@@ -9,10 +9,10 @@ class ApiConfig {
     if (Platform.isAndroid) {
       // Android 에뮬레이터: 10.0.2.2는 호스트 머신의 localhost를 가리킵니다
       // 실제 Android 기기 사용 시: PC의 IP 주소로 변경하세요 (예: 'http://192.168.0.100:8000/api')
-      return 'http://10.0.2.2:8000/api';
+      return 'http://220.118.162.20/api';
     } else {
       // iOS 시뮬레이터 또는 실제 iOS 기기
-      return 'http://localhost:8000/api';
+      return 'http://220.118.162.20/api';
     }
   }
   

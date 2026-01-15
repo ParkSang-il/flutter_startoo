@@ -11,7 +11,7 @@ import '../../widgets/custom_bottom_navigation_bar.dart';
 import '../search_screen.dart';
 import '../create_screen.dart';
 import '../activity_screen.dart';
-import '../profile_screen.dart';
+import '../mypage/mypage_screen.dart';
 import 'controllers/feed_list_controller.dart';
 
 class FeedListPage extends StatefulWidget {
@@ -100,7 +100,7 @@ class _FeedListPageState extends State<FeedListPage> {
       case 3:
         return const ActivityScreen();
       case 4:
-        return const ProfileScreen();
+        return const MyPageScreen();
       default:
         return _buildFeedList();
     }
@@ -222,6 +222,7 @@ class _FeedListPageState extends State<FeedListPage> {
               
               final feed = FeedModel(
                 portfolioId: portfolio.id,
+                portfolioOwnerId: portfolio.userId,
                 username: portfolio.user.username,
                 userImage: portfolio.user.profileImage,
                 userType: portfolio.user.userType,
@@ -236,7 +237,13 @@ class _FeedListPageState extends State<FeedListPage> {
                 businessName: portfolio.business.businessName,
                 isLiked: portfolio.isLiked,
               );
-              return FeedItem(feed: feed);
+              return FeedItem(
+                feed: feed,
+                onCommentAdded: () {
+                  // 댓글 작성 후 해당 포트폴리오만 업데이트
+                  _feedController.updatePortfolio(feed.portfolioId);
+                },
+              );
             },
             childCount: _feedController.isLoading 
                 ? 10 

@@ -1075,10 +1075,41 @@ class AuthService {
 
       if (response.data is Map<String, dynamic>) {
         final data = response.data as Map<String, dynamic>;
-        return ApiResponse.fromJson(
-          data,
-          (commentData) => Comment.fromJson(commentData['comment'] as Map<String, dynamic>),
-        );
+        // 응답 구조: {success: true, message: "...", data: {comment: {id: 6, is_pinned: true}}}
+        final responseData = data['data'] as Map<String, dynamic>?;
+        final commentData = responseData?['comment'] as Map<String, dynamic>?;
+        
+        if (commentData != null) {
+          // 최소한의 Comment 객체 생성 (필수 필드만)
+          final comment = Comment(
+            id: commentData['id'] ?? 0,
+            portfolioId: portfolioId,
+            parentId: null,
+            content: '', // 응답에 없으므로 기본값
+            isPinned: commentData['is_pinned'] ?? false,
+            createdAt: '', // 응답에 없으므로 기본값
+            updatedAt: '', // 응답에 없으므로 기본값
+            user: CommentUser(
+              id: 0,
+              username: '',
+              profileImage: '',
+              userType: 0,
+            ), // 응답에 없으므로 기본값
+            repliesCount: 0, // 응답에 없으므로 기본값
+          );
+          return ApiResponse(
+            success: data['success'] ?? false,
+            message: data['message'] ?? '',
+            data: comment,
+          );
+        } else {
+          // comment 데이터가 없어도 성공 응답이면 성공으로 처리 (댓글 목록을 다시 로드하므로)
+          return ApiResponse(
+            success: data['success'] ?? false,
+            message: data['message'] ?? '',
+            data: null,
+          );
+        }
       } else {
         return ApiResponse(
           success: false,
@@ -1103,6 +1134,58 @@ class AuthService {
       );
     } catch (e) {
       debugPrint('댓글 고정/해제 예상치 못한 에러: $e');
+      return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 포트폴리오 신고
+  Future<ApiResponse<void>> reportPortfolio(int portfolioId) async {
+    try {
+      debugPrint('=== 포트폴리오 신고 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/report');
+      debugPrint('Method: POST');
+
+      final response = await _apiClient.dio.post(
+        '/portfolios/$portfolioId/report',
+      );
+
+      debugPrint('=== 포트폴리오 신고 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        return ApiResponse(
+          success: data['success'] ?? false,
+          message: data['message'] ?? '신고가 완료되었습니다.',
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('포트폴리오 신고 API 에러: ${e.type}, ${e.message}');
+      debugPrint('응답 데이터: ${e.response?.data}');
+      
+      String errorMessage = '신고에 실패했습니다.';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
+      
+      return ApiResponse(
+        success: false,
+        message: errorMessage,
+      );
+    } catch (e) {
+      debugPrint('포트폴리오 신고 예상치 못한 에러: $e');
       return ApiResponse(
         success: false,
         message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',

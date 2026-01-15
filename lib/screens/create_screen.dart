@@ -120,6 +120,8 @@ class _CreateScreenState extends State<CreateScreen> {
 
       if (mounted) {
         if (response.success) {
+          // 키보드 닫기
+          FocusScope.of(context).unfocus();
           SnackBarHelper.showSuccess(context, '게시물이 등록되었습니다.');
           Navigator.of(context).pop();
         } else {

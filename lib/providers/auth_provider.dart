@@ -399,5 +399,10 @@ class AuthProvider with ChangeNotifier {
   Future<ApiResponse<Comment>> pinComment(int portfolioId, int commentId, bool isPinned) async {
     return await _authService.pinComment(portfolioId, commentId, isPinned);
   }
+
+  // 포트폴리오 신고
+  Future<ApiResponse<void>> reportPortfolio(int portfolioId) async {
+    return await _authService.reportPortfolio(portfolioId);
+  }
 }
 

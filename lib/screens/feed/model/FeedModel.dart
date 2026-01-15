@@ -1,6 +1,7 @@
 // lib/models/feed_model.dart (예시 경로)
 class FeedModel {
   final int portfolioId;
+  final int portfolioOwnerId; // 포트폴리오 작성자 ID
   final String username;
   final String userImage;
   final String postImage; // 하위 호환성을 위해 유지
@@ -15,6 +16,7 @@ class FeedModel {
 
   FeedModel({
     required this.portfolioId,
+    required this.portfolioOwnerId,
     required this.username,
     required this.userImage,
     required this.postImage,

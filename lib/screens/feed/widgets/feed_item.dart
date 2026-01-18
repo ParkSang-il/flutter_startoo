@@ -5,6 +5,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import '../image_detail_screen.dart';
 import '../../../utils/tag_helper.dart';
 import '../../../utils/number_formatter.dart';
+import '../../../utils/image_url_helper.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../utils/snackbar_helper.dart';
 import 'comment_modal.dart';
@@ -200,7 +201,9 @@ class _FeedItemState extends State<FeedItem> {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundImage: NetworkImage(widget.feed.userImage),
+                  backgroundImage: NetworkImage(
+                    ImageUrlHelper.buildGeneralImageUrl(widget.feed.userImage),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Expanded(
@@ -550,9 +553,12 @@ class _FeedItemState extends State<FeedItem> {
       );
     }
 
+    // 피드 이미지 URL 생성 (너비 300)
+    final feedImageUrl = ImageUrlHelper.buildFeedImageUrl(imageUrl);
+
     // 비율이 아직 계산되지 않았으면 이미지를 로드하면서 비율 감지
     return Image.network(
-      imageUrl,
+      feedImageUrl,
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
@@ -560,7 +566,7 @@ class _FeedItemState extends State<FeedItem> {
         // 프레임이 있고 비율이 아직 계산되지 않았을 때만 계산
         if (frame != null && !_imageAspectRatios.containsKey(index)) {
           // 이미지 프레임에서 크기 정보 가져오기 (한 번만 실행)
-          final imageProvider = NetworkImage(imageUrl);
+          final imageProvider = NetworkImage(feedImageUrl);
           imageProvider.resolve(ImageConfiguration()).addListener(
             ImageStreamListener(
               (ImageInfo imageInfo, bool synchronousCall) {
@@ -650,8 +656,11 @@ class _FeedItemState extends State<FeedItem> {
       );
     }
 
+    // 피드 이미지 URL 생성 (너비 300)
+    final feedImageUrl = ImageUrlHelper.buildFeedImageUrl(imageUrl);
+
     return Image.network(
-      imageUrl,
+      feedImageUrl,
       fit: BoxFit.cover,
       width: double.infinity,
       loadingBuilder: (context, child, loadingProgress) {

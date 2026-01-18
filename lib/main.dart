@@ -36,12 +36,12 @@ class MyApp extends StatelessWidget {
             onPrimary: Color(0xFF93B1A6),  // primary 위에 표시되는 텍스트/아이콘 색상
 
             // Secondary - 보조 색상
-            secondary: Color(0xFF3FD1FF),
+            secondary: Color(0xFF2DEB82),
             onSecondary: Color(0xFFFFFFFF),  // secondary 위에 표시되는 텍스트/아이콘 색상
 
             // Tertiary - 3차 색상 (Material 3)
             tertiary: Color(0xFF212121),
-            onTertiary: Color(0xFFFFFFFF),
+            onTertiary: Color(0xFF791FFF),
 
             // 기타 필수 색상
             error: Colors.red,

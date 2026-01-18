@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import '../../utils/image_url_helper.dart';
 
 class ImageDetailScreen extends StatefulWidget {
   final List<String> imageUrls;
@@ -36,6 +37,7 @@ class _ImageDetailScreenState extends State<ImageDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -55,36 +57,49 @@ class _ImageDetailScreenState extends State<ImageDetailScreen> {
               });
             },
             itemBuilder: (context, index) {
-              return InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 3.0,
-                child: Center(
-                  child: Image.network(
-                    widget.imageUrls[index],
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final appBarHeight = AppBar().preferredSize.height;
+                  final statusBarHeight = MediaQuery.of(context).padding.top;
+                  
+                  return Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        top: (appBarHeight + statusBarHeight) / 2,
+                        bottom: widget.imageUrls.length > 1 ? 50.0 : 0.0,
+                      ),
+                      child: InteractiveViewer(
+                        minScale: 0.5,
+                        maxScale: 3.0,
+                        child: Image.network(
+                          ImageUrlHelper.buildDetailImageUrl(widget.imageUrls[index]),
+                          fit: BoxFit.contain,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                color: Colors.white,
+                                size: 50,
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Icon(
-                          Icons.broken_image,
-                          color: Colors.white,
-                          size: 50,
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                    ),
+                  );
+                },
               );
             },
           ),

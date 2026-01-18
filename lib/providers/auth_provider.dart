@@ -4,6 +4,7 @@ import '../models/api_response.dart';
 import '../models/portfolio_model.dart';
 import '../models/like_response.dart';
 import '../models/comment_model.dart';
+import '../screens/mypage/model/artist_profile_response.dart';
 import '../services/auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -403,6 +404,16 @@ class AuthProvider with ChangeNotifier {
   // 포트폴리오 신고
   Future<ApiResponse<void>> reportPortfolio(int portfolioId) async {
     return await _authService.reportPortfolio(portfolioId);
+  }
+
+  // 아티스트 프로필 정보 조회
+  Future<ArtistProfileResponse> getArtistProfile() async {
+    return await _authService.getArtistProfile();
+  }
+
+  // 일반회원 프로필 정보 조회
+  Future<UserProfileResponse> getUserProfile() async {
+    return await _authService.getUserProfile();
   }
 }
 

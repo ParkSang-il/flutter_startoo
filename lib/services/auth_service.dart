@@ -6,6 +6,7 @@ import '../models/phone_check_response.dart';
 import '../models/portfolio_model.dart';
 import '../models/like_response.dart';
 import '../models/comment_model.dart';
+import '../screens/mypage/model/artist_profile_response.dart';
 import '../utils/api_client.dart';
 
 class AuthService {
@@ -1187,6 +1188,110 @@ class AuthService {
     } catch (e) {
       debugPrint('포트폴리오 신고 예상치 못한 에러: $e');
       return ApiResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 아티스트 프로필 정보 조회
+  Future<ArtistProfileResponse> getArtistProfile() async {
+    try {
+      debugPrint('=== 아티스트 프로필 조회 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/auth/artist-profile');
+      debugPrint('Method: GET');
+
+      final response = await _apiClient.dio.get('/auth/artist-profile');
+
+      debugPrint('=== 아티스트 프로필 조회 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        return ArtistProfileResponse.fromJson(response.data);
+      } else {
+        debugPrint('응답 형식 오류: ${response.data.runtimeType}');
+        return ArtistProfileResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('아티스트 프로필 조회 DioException: ${e.toString()}');
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        final responseData = e.response!.data;
+        debugPrint('에러 응답: Status=$statusCode, Data=$responseData');
+        
+        if (responseData is Map<String, dynamic>) {
+          return ArtistProfileResponse.fromJson(responseData);
+        }
+        
+        return ArtistProfileResponse(
+          success: false,
+          message: responseData['message'] ?? '아티스트 프로필 조회에 실패했습니다.',
+        );
+      } else {
+        return ArtistProfileResponse(
+          success: false,
+          message: '네트워크 오류가 발생했습니다.',
+        );
+      }
+    } catch (e) {
+      debugPrint('아티스트 프로필 조회 예외: ${e.toString()}');
+      return ArtistProfileResponse(
+        success: false,
+        message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
+      );
+    }
+  }
+
+  // 일반회원 프로필 정보 조회
+  Future<UserProfileResponse> getUserProfile() async {
+    try {
+      debugPrint('=== 일반회원 프로필 조회 API 요청 ===');
+      debugPrint('URL: ${ApiClient.baseUrl}/auth/user-profile');
+      debugPrint('Method: GET');
+
+      final response = await _apiClient.dio.get('/auth/user-profile');
+
+      debugPrint('=== 일반회원 프로필 조회 API 응답 ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('응답 데이터: ${response.data}');
+
+      if (response.data is Map<String, dynamic>) {
+        return UserProfileResponse.fromJson(response.data);
+      } else {
+        debugPrint('응답 형식 오류: ${response.data.runtimeType}');
+        return UserProfileResponse(
+          success: false,
+          message: '서버 응답 형식이 올바르지 않습니다.',
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint('일반회원 프로필 조회 DioException: ${e.toString()}');
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        final responseData = e.response!.data;
+        debugPrint('에러 응답: Status=$statusCode, Data=$responseData');
+        
+        if (responseData is Map<String, dynamic>) {
+          return UserProfileResponse.fromJson(responseData);
+        }
+        
+        return UserProfileResponse(
+          success: false,
+          message: responseData['message'] ?? '일반회원 프로필 조회에 실패했습니다.',
+        );
+      } else {
+        return UserProfileResponse(
+          success: false,
+          message: '네트워크 오류가 발생했습니다.',
+        );
+      }
+    } catch (e) {
+      debugPrint('일반회원 프로필 조회 예외: ${e.toString()}');
+      return UserProfileResponse(
         success: false,
         message: '예상치 못한 오류가 발생했습니다: ${e.toString()}',
       );

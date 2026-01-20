@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
-import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as path;
 import '../config/ncp_config.dart';
 
@@ -10,11 +9,29 @@ class NcpStorageService {
   final Dio _dio = Dio();
   
   // 파일 업로드 (이미지)
-  Future<String?> uploadImage(File file, String fileName) async {
+  Future<String?> uploadImage(File file, String fileName, {String? objectKey}) async {
     try {
-      final objectKey = _generateObjectKey(fileName);
+      // objectKey가 제공되지 않으면 새로 생성
+      String finalObjectKey;
+      if (objectKey != null) {
+        // objectKey가 /로 시작하면 제거
+        finalObjectKey = objectKey.startsWith('/') ? objectKey.substring(1) : objectKey;
+      } else {
+        // 파일명 형식 변경: 년도월일시분초_중복없는짧은랜덤문자열.확장자
+        final now = DateTime.now();
+        final extension = path.extension(fileName);
+        final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+        final randomString = _generateRandomString(8);
+        final uniqueFileName = '${timestamp}_$randomString$extension';
+        
+        final year = now.year.toString();
+        final month = now.month.toString().padLeft(2, '0');
+        final day = now.day.toString().padLeft(2, '0');
+        finalObjectKey = '$year/$month/$day/$uniqueFileName';
+      }
+      
       // Path-style: endpoint/bucket/object-key
-      final url = '${NcpConfig.endpoint}/${NcpConfig.imageBucket}/$objectKey';
+      final url = '${NcpConfig.endpoint}/${NcpConfig.imageBucket}/$finalObjectKey';
       
       // 파일 읽기
       final fileBytes = await file.readAsBytes();
@@ -24,7 +41,7 @@ class NcpStorageService {
       final headers = _generateHeaders(
         method: 'PUT',
         bucket: NcpConfig.imageBucket,
-        objectKey: objectKey,
+        objectKey: finalObjectKey,
         contentType: contentType,
         contentLength: fileBytes.length,
         payload: fileBytes,
@@ -42,7 +59,8 @@ class NcpStorageService {
       );
       
       if (response.statusCode == 200) {
-        return '/${NcpConfig.imageBucket}/$objectKey';
+        // 이미지 URL만 반환 (버킷 이름 제거, 경로만)
+        return '/$finalObjectKey';
       }
       
       return null;
@@ -94,8 +112,89 @@ class NcpStorageService {
       return null;
     }
   }
+
+  // 비디오 업로드 (startoo-vod 버킷)
+  Future<String?> uploadVideo(File file, String fileName, {String? videoFileName}) async {
+    try {
+      // mp4 확장자만 허용
+      final extension = path.extension(fileName).toLowerCase();
+      if (extension != '.mp4') {
+        print('비디오는 mp4 확장자만 허용됩니다.');
+        return null;
+      }
+
+      // videoFileName이 제공되면 사용, 아니면 새로 생성
+      String finalObjectKey;
+      if (videoFileName != null && videoFileName.isNotEmpty) {
+        // videoFileName은 파일명만 (예: 20260120123456_abc12345.mp4)
+        // generateVideoPath에서 생성한 파일명을 그대로 사용
+        // 파일명의 타임스탬프에서 년/월/일 추출
+        // 형식: YYYYMMDDHHmmss_random.ext
+        final cleanFileName = path.basename(videoFileName); // 경로가 포함되어 있을 수 있으므로 파일명만 추출
+        final fileNameWithoutExt = path.basenameWithoutExtension(cleanFileName);
+        final parts = fileNameWithoutExt.split('_');
+        if (parts.length >= 2 && parts[0].length >= 8) {
+          // 타임스탬프에서 년/월/일 추출 (YYYYMMDD)
+          final timestamp = parts[0];
+          final year = timestamp.substring(0, 4);
+          final month = timestamp.substring(4, 6);
+          final day = timestamp.substring(6, 8);
+          finalObjectKey = '$year/$month/$day/$cleanFileName';
+        } else {
+          // 파싱 실패 시 현재 날짜 사용
+          final now = DateTime.now();
+          final year = now.year.toString();
+          final month = now.month.toString().padLeft(2, '0');
+          final day = now.day.toString().padLeft(2, '0');
+          finalObjectKey = '$year/$month/$day/$cleanFileName';
+        }
+      } else {
+        // videoFileName이 없으면 새로 생성 (하지만 이 경우는 발생하지 않아야 함)
+        finalObjectKey = _generateVideoObjectKey(fileName);
+      }
+      // Path-style: endpoint/bucket/object-key
+      final url = '${NcpConfig.endpoint}/${NcpConfig.vodBucket}/$finalObjectKey';
+      
+      // 파일 읽기
+      final fileBytes = await file.readAsBytes();
+      final contentType = 'video/mp4';
+      
+      // AWS Signature V4 생성 (Path-style: 버킷 이름을 URI에 포함)
+      final headers = _generateHeaders(
+        method: 'PUT',
+        bucket: NcpConfig.vodBucket,
+        objectKey: finalObjectKey,
+        contentType: contentType,
+        contentLength: fileBytes.length,
+        payload: fileBytes,
+        usePathStyle: true, // Path-style 사용
+      );
+      
+      // 파일 업로드
+      final response = await _dio.put(
+        url,
+        data: fileBytes,
+        options: Options(
+          headers: headers,
+          contentType: contentType,
+        ),
+      );
+      
+      if (response.statusCode == 200) {
+        // 비디오 파일명만 반환 (경로 제거, 파일명만)
+        // finalObjectKey는 "2026/01/16/파일명.mp4" 형식이므로 파일명만 추출
+        final fileName = path.basename(finalObjectKey);
+        return fileName;
+      }
+      
+      return null;
+    } catch (e) {
+      print('NCP Storage 비디오 업로드 에러: $e');
+      return null;
+    }
+  }
   
-  // Object Key 생성 (/연도/월/파일명)
+  // Object Key 생성 (/연도/월/파일명) - 이미지용
   String _generateObjectKey(String fileName) {
     final now = DateTime.now();
     final year = now.year.toString();
@@ -108,6 +207,63 @@ class NcpStorageService {
     final uniqueFileName = '${nameWithoutExt}_$timestamp$extension';
     
     return '$year/$month/$uniqueFileName';
+  }
+
+  // Object Key 생성 (/연도/월/일/파일명) - 비디오용
+  String _generateVideoObjectKey(String fileName) {
+    final now = DateTime.now();
+    final year = now.year.toString();
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    
+    // 파일명 형식: 년도월일시분초_중복없는짧은랜덤문자열.확장자
+    final extension = path.extension(fileName);
+    final timestamp = '${year}${month}${day}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+    final randomString = _generateRandomString(8);
+    final uniqueFileName = '${timestamp}_$randomString$extension';
+    
+    return '$year/$month/$day/$uniqueFileName';
+  }
+
+  // 랜덤 문자열 생성
+  String _generateRandomString(int length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final random = DateTime.now().millisecondsSinceEpoch;
+    final buffer = StringBuffer();
+    for (int i = 0; i < length; i++) {
+      buffer.write(chars[(random + i) % chars.length]);
+    }
+    return buffer.toString();
+  }
+
+  // 이미지 파일 경로만 생성 (업로드하지 않음)
+  String generateImagePath(String fileName) {
+    final now = DateTime.now();
+    final extension = path.extension(fileName);
+    final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+    final randomString = _generateRandomString(8);
+    final uniqueFileName = '${timestamp}_$randomString$extension';
+    
+    final year = now.year.toString();
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    final objectKey = '$year/$month/$day/$uniqueFileName';
+    
+    // 상대 경로만 반환 (버킷 이름 제거)
+    return '/$objectKey';
+  }
+
+  // 비디오 파일 경로만 생성 (업로드하지 않음)
+  String generateVideoPath(String fileName) {
+    // mp4 확장자만 허용
+    final extension = path.extension(fileName).toLowerCase();
+    if (extension != '.mp4') {
+      throw Exception('비디오는 mp4 확장자만 허용됩니다.');
+    }
+
+    final objectKey = _generateVideoObjectKey(fileName);
+    // 파일명만 반환 (경로 제거)
+    return path.basename(objectKey);
   }
   
   // Content-Type 결정

@@ -1,3 +1,5 @@
+import '../../../models/portfolio_model.dart';
+
 // lib/models/feed_model.dart (예시 경로)
 class FeedModel {
   final int portfolioId;
@@ -6,6 +8,7 @@ class FeedModel {
   final String userImage;
   final String postImage; // 하위 호환성을 위해 유지
   final List<String> postImages; // 이미지 리스트 추가
+  final List<PortfolioMedia> media; // 미디어 리스트 (이미지 + 비디오)
   final String caption;
   final int likes;
   final int comments;
@@ -21,6 +24,7 @@ class FeedModel {
     required this.userImage,
     required this.postImage,
     required this.postImages, // 이미지 리스트 필수
+    required this.media, // 미디어 리스트 필수
     required this.caption,
     required this.likes,
     required this.comments,

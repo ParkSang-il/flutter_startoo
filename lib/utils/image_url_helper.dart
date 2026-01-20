@@ -1,5 +1,5 @@
 class ImageUrlHelper {
-  static const String baseImageUrl = 'http://6n86dw2k13558.edge.naverncp.com/Q1MW6O4ec9';
+  static const String baseImageUrl = 'https://6n86dw2k13558.edge.naverncp.com/Q1MW6O4ec9';
 
   /// 이미지 URL을 전체 URL로 변환
   /// [imagePath] 상대 경로 또는 전체 URL

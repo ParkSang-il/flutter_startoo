@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:video_player/video_player.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../services/auth_service.dart';
 import '../services/ncp_storage_service.dart';
 import '../utils/snackbar_helper.dart';
-import '../config/ncp_config.dart';
 import 'feed/controllers/tag_highlight_controller.dart';
 
 class CreateScreen extends StatefulWidget {
@@ -15,6 +16,14 @@ class CreateScreen extends StatefulWidget {
 
   @override
   State<CreateScreen> createState() => _CreateScreenState();
+}
+
+// 미디어 타입을 구분하기 위한 클래스
+class MediaItem {
+  final File file;
+  final bool isVideo;
+  
+  MediaItem({required this.file, required this.isVideo});
 }
 
 class _CreateScreenState extends State<CreateScreen> {
@@ -26,7 +35,11 @@ class _CreateScreenState extends State<CreateScreen> {
   final AuthService _authService = AuthService();
   final NcpStorageService _storageService = NcpStorageService();
   List<File> _selectedImages = [];
+  List<File> _selectedVideos = [];
+  List<MediaItem> _mediaItems = []; // 이미지와 비디오를 순서대로 관리
   bool _isUploading = false;
+  Map<int, VideoPlayerController?> _videoControllers = {}; // 비디오 컨트롤러 저장
+  Map<int, bool> _videoPlaying = {}; // 비디오 재생 상태 저장
 
   // 태그 추출 로직
   List<String> _extractTags(String text) {
@@ -39,29 +52,108 @@ class _CreateScreenState extends State<CreateScreen> {
         .toList();
   }
 
-  Future<void> _pickImages() async {
+  // 미디어 선택 (이미지/비디오 통합)
+  Future<void> _pickMedia() async {
     try {
-      final List<XFile> images = await _imagePicker.pickMultiImage();
-      if (images.isNotEmpty) {
-        setState(() {
-          _selectedImages.addAll(images.map((xFile) => File(xFile.path)).toList());
-        });
+      // pickMedia를 사용하여 이미지와 비디오를 함께 선택
+      // pickMedia는 단일 선택이지만, 반복 호출로 여러 개 선택 가능
+      // 또는 pickMultipleMedia가 지원되는 경우 사용
+      List<XFile> medias = [];
+      
+      // pickMultipleMedia 시도 (최신 버전에서 지원)
+      try {
+        medias = await _imagePicker.pickMultipleMedia();
+      } catch (e) {
+        // pickMultipleMedia가 지원되지 않는 경우
+        // pickMedia를 반복 호출하거나 pickMultiImage 사용
+        debugPrint('pickMultipleMedia 미지원, pickMultiImage 사용: $e');
+        final images = await _imagePicker.pickMultiImage();
+        if (images.isNotEmpty) {
+          medias = images;
+        }
+      }
+      
+      if (medias.isNotEmpty) {
+        for (var media in medias) {
+          final file = File(media.path);
+          final extension = path.extension(media.path).toLowerCase();
+          
+          // 비디오인지 확인 (확장자로 판단)
+          final isVideo = extension == '.mp4' || extension == '.mov' || extension == '.avi' || 
+                         extension == '.mkv' || extension == '.webm' || extension == '.m4v';
+          
+          if (isVideo) {
+            // mp4 확장자만 허용
+            if (extension != '.mp4') {
+              if (mounted) {
+                SnackBarHelper.showError(context, '비디오는 mp4 확장자만 허용됩니다.');
+              }
+              continue;
+            }
+            
+            // 비디오 길이 체크 (1분 30초 = 90초)
+            await _validateAndAddVideo(file);
+          } else {
+            // 이미지 처리
+            setState(() {
+              _selectedImages.add(file);
+              _mediaItems.add(MediaItem(file: file, isVideo: false));
+            });
+          }
+        }
       }
     } catch (e) {
-      debugPrint('이미지 선택 에러: $e');
+      debugPrint('미디어 선택 에러: $e');
+      if (mounted) {
+        SnackBarHelper.showError(context, '미디어 선택 중 오류가 발생했습니다.');
+      }
     }
   }
+
+  // 비디오 검증 및 추가
+  Future<void> _validateAndAddVideo(File videoFile) async {
+    try {
+      final videoController = VideoPlayerController.file(videoFile);
+      await videoController.initialize();
+      final duration = videoController.value.duration;
+      await videoController.dispose();
+
+      if (duration.inSeconds > 90) {
+        if (mounted) {
+          SnackBarHelper.showError(context, '비디오는 1분 30초 이하여야 합니다.');
+        }
+        return;
+      }
+
+      setState(() {
+        _selectedVideos.add(videoFile);
+        _mediaItems.add(MediaItem(file: videoFile, isVideo: true));
+      });
+    } catch (e) {
+      debugPrint('비디오 길이 체크 에러: $e');
+      if (mounted) {
+        SnackBarHelper.showError(context, '비디오를 읽을 수 없습니다.');
+      }
+    }
+  }
+
+  // _pickImages와 _pickVideo는 _pickMedia로 통합되어 사용되지 않음
 
   @override
   void dispose() {
     _captionController.dispose();
+    // 비디오 컨트롤러 정리
+    for (var controller in _videoControllers.values) {
+      controller?.dispose();
+    }
+    _videoControllers.clear();
     super.dispose();
   }
 
   // --- 3. 게시글 등록 로직 수정 ---
   Future<void> _submitPost() async {
-    if (_selectedImages.isEmpty) {
-      SnackBarHelper.showError(context, '이미지는 최소 1개 이상 필요합니다.');
+    if (_mediaItems.isEmpty) {
+      SnackBarHelper.showError(context, '이미지 또는 비디오를 최소 1개 이상 선택해주세요.');
       return;
     }
 
@@ -74,33 +166,58 @@ class _CreateScreenState extends State<CreateScreen> {
     });
 
     try {
-      // 1. 이미지 업로드
-      List<Map<String, dynamic>> uploadedImages = [];
+      // 1. 파일 경로만 미리 생성 (업로드하지 않음)
+      List<Map<String, dynamic>> imagePaths = [];
+      List<Map<String, dynamic>> videoPaths = [];
+      List<Map<String, dynamic>> mediaFiles = []; // 실제 파일과 경로 정보 저장
+      int videoOrder = 0;
+      int imageOrder = 0;
+      bool hasVideoBefore = false; // 이미지 앞에 비디오가 있는지 확인
 
-      for (int i = 0; i < _selectedImages.length; i++) {
-        final file = _selectedImages[i];
-        final fileName = path.basename(file.path);
+      for (var mediaItem in _mediaItems) {
+        if (mediaItem.isVideo) {
+          // 비디오 파일 경로 생성 (업로드하지 않음)
+          final fileName = path.basename(mediaItem.file.path);
+          final filePath = _storageService.generateVideoPath(fileName);
 
-        final uploadedPath = await _storageService.uploadImage(file, fileName);
+          videoPaths.add({
+            'video_file_path': filePath,
+            'video_order': videoOrder,
+          });
+          mediaFiles.add({
+            'type': 'video',
+            'file': mediaItem.file,
+            'fileName': fileName,
+            'path': filePath,
+          });
+          videoOrder++;
+          hasVideoBefore = true;
+        } else {
+          // 이미지 파일 경로 생성 (업로드하지 않음)
+          final fileName = path.basename(mediaItem.file.path);
+          final filePath = _storageService.generateImagePath(fileName);
 
-        if (uploadedPath == null) {
-          if (mounted) SnackBarHelper.showError(context, '이미지 업로드에 실패했습니다.');
-          setState(() { _isUploading = false; });
-          return;
+          // 비디오가 먼저 있으면 image_order는 1부터 시작
+          final currentImageOrder = hasVideoBefore ? imageOrder + 1 : imageOrder;
+          
+          imagePaths.add({
+            'image_url': filePath, // 상대 경로만 전송
+            'image_order': currentImageOrder,
+            'scale': 1.0,
+            'offset_x': 0.0,
+            'offset_y': 0.0,
+          });
+          mediaFiles.add({
+            'type': 'image',
+            'file': mediaItem.file,
+            'fileName': fileName,
+            'path': filePath,
+          });
+          imageOrder++;
         }
-
-        final fullImageUrl = '${NcpConfig.endpoint}${uploadedPath}';
-
-        uploadedImages.add({
-          'image_url': fullImageUrl,
-          'image_order': i,
-          'scale': 1.0,
-          'offset_x': 0.0,
-          'offset_y': 0.0,
-        });
       }
 
-      // 2. 포트폴리오 생성
+      // 2. 포트폴리오 생성 API 호출 (파일 경로만 전송)
       final now = DateTime.now();
       final workDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
@@ -114,18 +231,59 @@ class _CreateScreenState extends State<CreateScreen> {
         workDate: workDate,
         price: 0,
         isPublic: true,
-        images: uploadedImages,
-        tags: extractedTags, // 추출된 태그 리스트를 서버로 전송
+        images: imagePaths,
+        tags: extractedTags,
+        videos: videoPaths.isNotEmpty ? videoPaths : null,
       );
 
       if (mounted) {
         if (response.success) {
-          // 키보드 닫기
-          FocusScope.of(context).unfocus();
-          SnackBarHelper.showSuccess(context, '게시물이 등록되었습니다.');
-          Navigator.of(context).pop();
+          // 3. API 성공 시 실제 파일 업로드
+          bool uploadSuccess = true;
+          for (var mediaFile in mediaFiles) {
+            if (mediaFile['type'] == 'video') {
+              // generateVideoPath에서 생성한 파일명 사용
+              final videoFileName = mediaFile['path'] as String;
+              
+              final uploadResult = await _storageService.uploadVideo(
+                mediaFile['file'] as File,
+                mediaFile['fileName'] as String,
+                videoFileName: videoFileName,
+              );
+              if (uploadResult == null) {
+                uploadSuccess = false;
+                debugPrint('비디오 업로드 실패: ${mediaFile['fileName']}');
+              }
+            } else {
+              // generateImagePath에서 생성한 경로 사용 (앞의 / 제거)
+              final objectKey = (mediaFile['path'] as String).startsWith('/')
+                  ? (mediaFile['path'] as String).substring(1)
+                  : mediaFile['path'] as String;
+              
+              final uploadResult = await _storageService.uploadImage(
+                mediaFile['file'] as File,
+                mediaFile['fileName'] as String,
+                objectKey: objectKey,
+              );
+              if (uploadResult == null) {
+                uploadSuccess = false;
+                debugPrint('이미지 업로드 실패: ${mediaFile['fileName']}');
+              }
+            }
+          }
+
+          if (uploadSuccess) {
+            // 키보드 닫기
+            FocusScope.of(context).unfocus();
+            SnackBarHelper.showSuccess(context, '게시물이 등록되었습니다.');
+            Navigator.of(context).pop();
+          } else {
+            SnackBarHelper.showError(context, '파일 업로드 중 일부 파일이 실패했습니다.');
+            setState(() { _isUploading = false; });
+          }
         } else {
           SnackBarHelper.showError(context, response.message);
+          setState(() { _isUploading = false; });
         }
       }
     } catch (e) {
@@ -180,8 +338,8 @@ class _CreateScreenState extends State<CreateScreen> {
                           },
                         ),
                         _buildTextField(),
-                        if (_selectedImages.isNotEmpty)
-                          _buildImagePreview(),
+                        if (_mediaItems.isNotEmpty)
+                          _buildMediaPreview(),
                         const SizedBox(height: 12),
                         _buildActionIcons(),
                       ],
@@ -219,12 +377,12 @@ class _CreateScreenState extends State<CreateScreen> {
             child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.blue)),
           )
               : GestureDetector(
-            onTap: _selectedImages.isEmpty ? null : _submitPost,
+            onTap: _mediaItems.isEmpty ? null : _submitPost,
             child: Text(
               '게시',
               style: TextStyle(
                 fontSize: 14,
-                color: _selectedImages.isEmpty ? Colors.blue.withOpacity(0.4) : Colors.blue,
+                color: _mediaItems.isEmpty ? Colors.blue.withOpacity(0.4) : Colors.blue,
               ),
             ),
           ),
@@ -244,7 +402,7 @@ class _CreateScreenState extends State<CreateScreen> {
               radius: 18,
               backgroundColor: Colors.grey,
               backgroundImage: profileImage != null && profileImage.isNotEmpty ? NetworkImage(profileImage) : null,
-              child: profileImage == null || profileImage.isEmpty ? const Icon(Icons.person, size: 18, color: Colors.white) : null,
+              child: profileImage == null || profileImage.isEmpty ? const FaIcon(FontAwesomeIcons.user, size: 18, color: Colors.white) : null,
             ),
             const SizedBox(height: 8),
             Container(width: 2, height: 100, color: Colors.grey.shade800),
@@ -271,29 +429,64 @@ class _CreateScreenState extends State<CreateScreen> {
     );
   }
 
-  Widget _buildImagePreview() {
+  Widget _buildMediaPreview() {
     return SizedBox(
       height: 240,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: _selectedImages.length,
+        itemCount: _mediaItems.length,
         itemBuilder: (context, index) {
+          final mediaItem = _mediaItems[index];
           return Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: Stack(
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.file(_selectedImages[index], height: 240, width: 180, fit: BoxFit.cover),
+                  child: mediaItem.isVideo
+                      ? _buildVideoPreview(index, mediaItem)
+                      : Image.file(mediaItem.file, height: 240, width: 180, fit: BoxFit.cover),
                 ),
+                if (mediaItem.isVideo)
+                  Positioned(
+                    top: 5,
+                    left: 5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'VIDEO',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
                 Positioned(
-                  top: 5, right: 5,
+                  top: 5,
+                  right: 5,
                   child: GestureDetector(
-                    onTap: () => setState(() => _selectedImages.removeAt(index)),
+                    onTap: () {
+                      setState(() {
+                        final item = _mediaItems[index];
+                        if (item.isVideo) {
+                          // 비디오 컨트롤러 정리
+                          final controller = _videoControllers[index];
+                          controller?.dispose();
+                          _videoControllers.remove(index);
+                          _videoPlaying.remove(index);
+                          _selectedVideos.remove(item.file);
+                        } else {
+                          _selectedImages.remove(item.file);
+                        }
+                        _mediaItems.removeAt(index);
+                      });
+                    },
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
+                      child: const FaIcon(FontAwesomeIcons.xmark, size: 16, color: Colors.white),
                     ),
                   ),
                 ),
@@ -305,19 +498,88 @@ class _CreateScreenState extends State<CreateScreen> {
     );
   }
 
+  // 비디오 미리보기 위젯
+  Widget _buildVideoPreview(int index, MediaItem mediaItem) {
+    final controller = _videoControllers[index];
+    final isPlaying = _videoPlaying[index] ?? false;
+
+    return Container(
+      height: 240,
+      width: 180,
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 비디오 플레이어 또는 플레이스홀더
+          if (controller != null && controller.value.isInitialized)
+            AspectRatio(
+              aspectRatio: controller.value.aspectRatio,
+              child: VideoPlayer(controller),
+            )
+          else
+            Container(color: Colors.black),
+          // 재생 버튼 오버레이
+          if (!isPlaying || controller == null || !controller.value.isInitialized)
+            GestureDetector(
+              onTap: () => _toggleVideoPlay(index, mediaItem.file),
+              child: Container(
+                color: Colors.black.withOpacity(0.3),
+                child: const Center(
+                  child: FaIcon(FontAwesomeIcons.circlePlay, size: 64, color: Colors.white),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 비디오 재생 토글
+  Future<void> _toggleVideoPlay(int index, File videoFile) async {
+    try {
+      final controller = _videoControllers[index];
+      
+      if (controller == null || !controller.value.isInitialized) {
+        // 비디오 초기화
+        final videoController = VideoPlayerController.file(videoFile);
+        await videoController.initialize();
+        
+        if (mounted) {
+          setState(() {
+            _videoControllers[index] = videoController;
+            _videoPlaying[index] = true;
+          });
+          videoController.play();
+          videoController.setLooping(true);
+        }
+      } else {
+        // 재생/일시정지 토글
+        if (controller.value.isPlaying) {
+          controller.pause();
+          setState(() {
+            _videoPlaying[index] = false;
+          });
+        } else {
+          controller.play();
+          setState(() {
+            _videoPlaying[index] = true;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('비디오 재생 에러: $e');
+    }
+  }
+
   Widget _buildActionIcons() {
     return Row(
       children: [
         GestureDetector(
-          onTap: _pickImages,
-          child: Icon(Icons.photo_library_outlined, color: Colors.grey.shade500, size: 22),
+          onTap: _pickMedia,
+          child: FaIcon(FontAwesomeIcons.image, color: Colors.grey.shade500, size: 22),
         ),
         const SizedBox(width: 20),
-        Icon(Icons.camera_alt_outlined, color: Colors.grey.shade500, size: 22),
-        const SizedBox(width: 20),
-        Icon(Icons.mic_none, color: Colors.grey.shade500, size: 22),
-        const SizedBox(width: 20),
-        Icon(Icons.gif_box_outlined, color: Colors.grey.shade500, size: 22),
+        FaIcon(FontAwesomeIcons.camera, color: Colors.grey.shade500, size: 22),
       ],
     );
   }

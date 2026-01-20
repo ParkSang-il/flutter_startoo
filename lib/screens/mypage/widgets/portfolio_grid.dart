@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 enum PortfolioGridType {
   image,
@@ -27,10 +28,10 @@ class PortfolioGrid extends StatelessWidget {
       itemBuilder: (context, index) {
         return Container(
           color: Colors.grey.shade800,
-          child: Icon(
+          child: FaIcon(
             type == PortfolioGridType.video
-                ? Icons.play_circle_outline
-                : Icons.image,
+                ? FontAwesomeIcons.circlePlay
+                : FontAwesomeIcons.image,
             color: Colors.grey.shade600,
           ),
         );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/auth_provider.dart';
 import 'auth/login_or_register_screen.dart';
 
@@ -16,7 +17,7 @@ class HomeScreen extends StatelessWidget {
         actions: [
           if (authProvider.isAuthenticated)
             IconButton(
-              icon: const Icon(Icons.logout),
+              icon: const FaIcon(FontAwesomeIcons.rightFromBracket),
               onPressed: () async {
                 await authProvider.logout();
                 if (context.mounted) {
@@ -45,7 +46,7 @@ class HomeScreen extends StatelessWidget {
                   else
                     const CircleAvatar(
                       radius: 50,
-                      child: Icon(Icons.person, size: 50),
+                      child: FaIcon(FontAwesomeIcons.user, size: 50),
                     ),
                   const SizedBox(height: 24),
                   Text(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../widgets/custom_text_button.dart';
 import 'phone_input_screen.dart';
 import 'terms_agreement_screen.dart';
@@ -91,7 +92,7 @@ class LoginOrRegisterScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.copyright_outlined,
+            FaIcon(FontAwesomeIcons.copyright,
                 color: Colors.grey.shade700, size: 15),
             const SizedBox(width: 2),
             Text('STARTOO',

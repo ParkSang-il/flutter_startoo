@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 // 스켈레톤 피드 아이템 위젯 생성
 class FeedItemSkeleton extends StatelessWidget {
@@ -57,7 +58,7 @@ class FeedItemSkeleton extends StatelessWidget {
                     children: List.generate(4, (index) =>
                         Padding(
                           padding: const EdgeInsets.only(right: 16.0),
-                          child: _shimmer(const Icon(Icons.circle, size: 22)),
+                          child: _shimmer(const FaIcon(FontAwesomeIcons.circle, size: 22)),
                         ),
                     ),
                   ),

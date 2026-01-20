@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class CustomRefreshIndicator extends StatefulWidget {
   final Widget child;
@@ -176,8 +177,8 @@ class _CustomRefreshIndicatorState extends State<CustomRefreshIndicator>
                       : Transform.rotate(
                           angle: _controller.value * 2 * 3.14159,
                           child: widget.refreshIcon ??
-                              Icon(
-                                Icons.refresh,
+                              FaIcon(
+                                FontAwesomeIcons.arrowsRotate,
                                 color: widget.iconColor ?? Theme.of(context).colorScheme.primary,
                                 size: 24,
                               ),

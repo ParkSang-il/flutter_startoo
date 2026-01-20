@@ -4,7 +4,6 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:starttoo/screens/feed/feed_list_screen.dart';
 import '../providers/auth_provider.dart';
 import '../utils/api_client.dart';
-import 'home_screen.dart';
 import 'auth/login_or_register_screen.dart';
 
 class SplashScreen extends StatefulWidget {

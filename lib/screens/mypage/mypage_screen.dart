@@ -83,15 +83,15 @@ class _MyPageScreenState extends State<MyPageScreen> {
         actions: [
           IconButton(
             onPressed: () {},
-            icon: Icon(
-              Icons.add_box_outlined,
+            icon: FaIcon(
+              FontAwesomeIcons.squarePlus,
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           IconButton(
             onPressed: () {},
-            icon: Icon(
-              Icons.menu,
+            icon: FaIcon(
+              FontAwesomeIcons.bars,
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
@@ -113,8 +113,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
                     labelColor: Theme.of(context).colorScheme.onSurface,
                     unselectedLabelColor: Colors.grey,
                     tabs: const [
-                      Tab(icon: Icon(Icons.grid_on)),
-                      Tab(icon: Icon(Icons.movie_outlined)),
+                      Tab(icon: FaIcon(FontAwesomeIcons.th)), // grid 대신 th 사용
+                      Tab(icon: FaIcon(FontAwesomeIcons.film)),
                     ],
                   ),
                 ),

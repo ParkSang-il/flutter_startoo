@@ -10,5 +10,6 @@ class NcpConfig {
   // 버킷 이름
   static String imageBucket = 'uploadimage';
   static String fileBucket = 'uploadfile';
+  static String vodBucket = 'startoo-vod';
 }
 

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../providers/auth_provider.dart';
-import '../../../models/auth_response.dart';
 import '../../../utils/image_url_helper.dart';
 import '../model/artist_profile_response.dart';
 
@@ -173,7 +172,7 @@ class _ProfileHeaderState extends State<ProfileHeader> {
                       ? NetworkImage(ImageUrlHelper.buildGeneralImageUrl(user.profileImage))
                       : null,
                   child: (user.profileImage == null || user.profileImage!.isEmpty)
-                      ? Icon(Icons.person, size: 40, color: Colors.grey.shade600)
+                      ? FaIcon(FontAwesomeIcons.user, size: 40, color: Colors.grey.shade600)
                       : null,
                 ),
               ),
@@ -318,7 +317,7 @@ class _ProfileHeaderState extends State<ProfileHeader> {
                           ? NetworkImage(ImageUrlHelper.buildGeneralImageUrl(user.profileImage))
                           : null,
                       child: (user.profileImage == null || (user.profileImage?.isEmpty ?? true))
-                          ? Icon(Icons.person, size: 30, color: Colors.grey.shade600)
+                          ? FaIcon(FontAwesomeIcons.user, size: 30, color: Colors.grey.shade600)
                           : null,
                     ),
                   ),
@@ -591,7 +590,7 @@ class _ProfileHeaderState extends State<ProfileHeader> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade600),
+            FaIcon(FontAwesomeIcons.circleExclamation, size: 48, color: Colors.grey.shade600),
             const SizedBox(height: 16),
             Text(
               _errorMessage ?? '프로필 정보를 불러오는데 실패했습니다.',

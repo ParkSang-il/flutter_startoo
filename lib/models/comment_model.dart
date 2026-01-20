@@ -26,6 +26,7 @@ class Comment {
   final int portfolioId;
   final int? parentId;
   final String content;
+  final String? gifImageUrl; // GIF 이미지 URL
   final bool isPinned;
   final String createdAt;
   final String updatedAt;
@@ -38,6 +39,7 @@ class Comment {
     required this.portfolioId,
     this.parentId,
     required this.content,
+    this.gifImageUrl,
     required this.isPinned,
     required this.createdAt,
     required this.updatedAt,
@@ -52,6 +54,7 @@ class Comment {
       portfolioId: json['portfolio_id'] ?? 0,
       parentId: json['parent_id'],
       content: json['content'] ?? '',
+      gifImageUrl: json['gif_image_url'],
       isPinned: json['is_pinned'] ?? false,
       createdAt: json['created_at'] ?? '',
       updatedAt: json['updated_at'] ?? '',

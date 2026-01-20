@@ -607,13 +607,14 @@ class AuthService {
     required bool isPublic,
     required List<Map<String, dynamic>> images,
     required List<String> tags,
+    List<Map<String, dynamic>>? videos,
   }) async {
     try {
       debugPrint('=== 포트폴리오 생성 API 요청 ===');
       debugPrint('URL: ${ApiClient.baseUrl}/portfolios');
       debugPrint('Method: POST');
 
-      final requestData = {
+      final requestData = <String, dynamic>{
         'title': title,
         'description': description,
         'work_date': workDate,
@@ -622,6 +623,11 @@ class AuthService {
         'images': images,
         'tags': tags,
       };
+
+      // videos가 있으면 추가
+      if (videos != null && videos.isNotEmpty) {
+        requestData['videos'] = videos;
+      }
 
       debugPrint('Body: $requestData');
 
@@ -900,14 +906,15 @@ class AuthService {
   }
 
   // 댓글 작성
-  Future<ApiResponse<Comment>> createComment(int portfolioId, String content, {int? parentId}) async {
+  Future<ApiResponse<Comment>> createComment(int portfolioId, String content, {int? parentId, String? gifImageUrl}) async {
     try {
       debugPrint('=== 댓글 작성 API 요청 ===');
       debugPrint('URL: ${ApiClient.baseUrl}/portfolios/$portfolioId/comments');
       debugPrint('Method: POST');
 
       final requestData = {
-        'content': content,
+        'content': content.isEmpty ? null : content,
+        'gif_image_url': gifImageUrl,
         if (parentId != null) 'parent_id': parentId,
       };
 

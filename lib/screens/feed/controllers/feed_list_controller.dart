@@ -163,9 +163,19 @@ class FeedListController extends ChangeNotifier {
           createdAt: '',
           updatedAt: '',
           images: [],
+          media: [],
           tags: [],
-          user: PortfolioUser(id: 0, username: '', profileImage: '', userType: 0),
-          business: PortfolioBusiness(id: 0, userId: 0, businessName: ''),
+          user: PortfolioUser(
+            id: 0,
+            username: '',
+            profileImage: '',
+            userType: 1,
+          ),
+          business: PortfolioBusiness(
+            id: 0,
+            userId: 0,
+            businessName: '',
+          ),
         ),
       );
       

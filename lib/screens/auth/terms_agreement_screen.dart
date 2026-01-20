@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'phone_input_screen.dart';
 
 class TermsAgreementScreen extends StatefulWidget {
@@ -319,8 +320,8 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(
-                      Icons.close,
+                    icon: FaIcon(
+                      FontAwesomeIcons.xmark,
                       color: Theme.of(context).colorScheme.onSurface,
                     ),
                     onPressed: () => Navigator.of(context).pop(),

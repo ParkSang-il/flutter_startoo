@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/ncp_storage_service.dart';
@@ -32,6 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   File? _selectedBusinessCertificate;
   File? _selectedLicenseCertificate;
   File? _selectedSafetyEducationCertificate;
+  
   
   // 업로드 중 상태
   bool _uploadingBusinessCertificate = false;
@@ -522,7 +524,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Icon(Icons.upload_file, color: Theme.of(context).colorScheme.onPrimary),
+              : FaIcon(FontAwesomeIcons.fileArrowUp, color: Theme.of(context).colorScheme.onPrimary),
           label: Text(
             isUploading
                 ? '업로드 중...'

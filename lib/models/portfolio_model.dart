@@ -31,6 +31,66 @@ class PortfolioImage {
   }
 }
 
+// 미디어 타입 (이미지/비디오 통합)
+class PortfolioMedia {
+  final String type; // "image" or "video"
+  final int id;
+  final String? imageUrl;
+  final int? imageOrder;
+  final String? scale;
+  final String? offsetX;
+  final String? offsetY;
+  final String? videoUrl;
+  final String? videoThumbnailUrl;
+  final String? videoFilePath; // video_file_path (콜백 전에는 이것만 있을 수 있음)
+  final String? videoStatus; // video_status (complete, encoding, 등)
+  final int? videoOrder;
+  final int order; // 전체 순서
+  final String createdAt;
+
+  PortfolioMedia({
+    required this.type,
+    required this.id,
+    this.imageUrl,
+    this.imageOrder,
+    this.scale,
+    this.offsetX,
+    this.offsetY,
+    this.videoUrl,
+    this.videoThumbnailUrl,
+    this.videoFilePath,
+    this.videoStatus,
+    this.videoOrder,
+    required this.order,
+    required this.createdAt,
+  });
+
+  factory PortfolioMedia.fromJson(Map<String, dynamic> json) {
+    return PortfolioMedia(
+      type: json['type'] ?? 'image',
+      id: json['id'] ?? 0,
+      imageUrl: json['image_url'],
+      imageOrder: json['image_order'],
+      scale: json['scale'],
+      offsetX: json['offset_x'],
+      offsetY: json['offset_y'],
+      videoUrl: json['video_url'],
+      videoThumbnailUrl: json['video_thumbnail_url'],
+      videoFilePath: json['video_file_path'],
+      videoStatus: json['video_status'],
+      videoOrder: json['video_order'],
+      order: json['order'] ?? 0,
+      createdAt: json['created_at'] ?? '',
+    );
+  }
+
+  bool get isVideoComplete => videoStatus == 'complete';
+  bool get isVideoEncoding => videoStatus != null && videoStatus != 'complete';
+
+  bool get isVideo => type == 'video';
+  bool get isImage => type == 'image';
+}
+
 class PortfolioTag {
   final int id;
   final String name;
@@ -109,7 +169,8 @@ class Portfolio {
   final String createdAt;
   final String updatedAt;
   final String? deletedAt;
-  final List<PortfolioImage> images;
+  final List<PortfolioImage> images; // 하위 호환성을 위해 유지
+  final List<PortfolioMedia> media; // 새로운 media 배열
   final List<PortfolioTag> tags;
   final PortfolioUser user;
   final PortfolioBusiness business;
@@ -131,6 +192,7 @@ class Portfolio {
     required this.updatedAt,
     this.deletedAt,
     required this.images,
+    required this.media,
     required this.tags,
     required this.user,
     required this.business,
@@ -139,6 +201,26 @@ class Portfolio {
 
   factory Portfolio.fromJson(Map<String, dynamic> json) {
     print(json);
+    
+    // media 배열 파싱
+    final mediaList = (json['media'] as List<dynamic>?)
+        ?.map((item) => PortfolioMedia.fromJson(item as Map<String, dynamic>))
+        .toList() ?? [];
+    
+    // 하위 호환성을 위해 images 배열도 파싱 (media에서 이미지만 추출)
+    final imageList = mediaList
+        .where((m) => m.isImage && m.imageUrl != null)
+        .map((m) => PortfolioImage(
+              id: m.id,
+              portfolioId: json['id'] ?? 0,
+              imageUrl: m.imageUrl!,
+              imageOrder: m.imageOrder ?? 0,
+              scale: m.scale ?? '1.0',
+              offsetX: m.offsetX ?? '0.0',
+              offsetY: m.offsetY ?? '0.0',
+            ))
+        .toList();
+    
     return Portfolio(
       id: json['id'] ?? 0,
       userId: json['user_id'] ?? 0,
@@ -154,10 +236,8 @@ class Portfolio {
       createdAt: json['created_at'] ?? '',
       updatedAt: json['updated_at'] ?? '',
       deletedAt: json['deleted_at'],
-      images: (json['images'] as List<dynamic>?)
-              ?.map((item) => PortfolioImage.fromJson(item as Map<String, dynamic>))
-              .toList() ??
-          [],
+      images: imageList,
+      media: mediaList,
       tags: (json['tags'] as List<dynamic>?)
               ?.map((item) => PortfolioTag.fromJson(item as Map<String, dynamic>))
               .toList() ??

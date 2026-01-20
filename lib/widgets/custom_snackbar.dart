@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 enum SnackBarType {
   error,
@@ -50,13 +51,13 @@ class CustomSnackBar extends SnackBar {
   static IconData _getDefaultIcon(SnackBarType type) {
     switch (type) {
       case SnackBarType.error:
-        return Icons.error_outline;
+        return FontAwesomeIcons.circleExclamation;
       case SnackBarType.success:
-        return Icons.check_circle_outline;
+        return FontAwesomeIcons.circleCheck;
       case SnackBarType.info:
-        return Icons.info_outline;
+        return FontAwesomeIcons.circleInfo;
       case SnackBarType.success2:
-        return Icons.check_circle_outline;
+        return FontAwesomeIcons.circleCheck;
     }
   }
 

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/snackbar_helper.dart';
 import 'user_type_selection_screen.dart';
-import '../../screens/feed/feed_list_screen.dart';
 
 class VerificationCodeScreen extends StatefulWidget {
   final String phone;

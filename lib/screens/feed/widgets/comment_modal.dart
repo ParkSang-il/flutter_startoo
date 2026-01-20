@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:giphy_get/giphy_get.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../models/comment_model.dart';
 import '../../../utils/snackbar_helper.dart';
-import '../../../widgets/custom_snackbar.dart';
 
 class CommentModal extends StatefulWidget {
   final int portfolioId;
@@ -49,6 +52,9 @@ class _CommentModalState extends State<CommentModal> {
   
   // 댓글 수정 관련
   int? _editingCommentId;
+  
+  // GIF 관련
+  String? _selectedGifUrl;
 
   @override
   void initState() {
@@ -190,9 +196,50 @@ class _CommentModalState extends State<CommentModal> {
     }
   }
 
+  // Giphy에서 GIF 검색 및 선택
+  Future<void> _pickGif() async {
+    try {
+      // 플랫폼별 Giphy API 키 가져오기
+      String giphyApiKey;
+      if (Platform.isAndroid) {
+        giphyApiKey = dotenv.env['GIPHY_API_KEY_ANDROID'] ?? 'pdKPBcczQFM0629UA5qnC05nfTWA2WxT';
+      } else {
+        giphyApiKey = dotenv.env['GIPHY_API_KEY_IOS'] ?? 'wjFtCLcUzAwvh60qT2ApgAOoy5uhTykz';
+      }
+
+      // Giphy 검색 화면 표시
+      final GiphyGif? gif = await GiphyGet.getGif(
+        context: context,
+        apiKey: giphyApiKey,
+        lang: GiphyLanguage.korean,
+        randomID: 'starttoo',
+        tabColor: Theme.of(context).colorScheme.primary,
+      );
+
+      if (gif != null && gif.images?.original?.url != null) {
+        setState(() {
+          _selectedGifUrl = gif.images!.original!.url;
+        });
+      }
+    } catch (e) {
+      debugPrint('GIF 선택 에러: $e');
+      if (mounted) {
+        _showSnackBar(context, 'GIF 선택 중 오류가 발생했습니다.', isError: true);
+      }
+    }
+  }
+
+  // 선택한 GIF 제거
+  void _removeGif() {
+    setState(() {
+      _selectedGifUrl = null;
+    });
+  }
+
   Future<void> _submitComment() async {
     final content = _commentController.text.trim();
-    if (content.isEmpty) return;
+    // GIF가 선택되었거나 텍스트가 있으면 제출 가능
+    if (content.isEmpty && _selectedGifUrl == null) return;
 
     // 키보드 닫기
     FocusScope.of(context).unfocus();
@@ -251,10 +298,13 @@ class _CommentModalState extends State<CommentModal> {
       }
     } else {
       // 댓글 작성 모드
+      // content 또는 gif_image_url 중 하나는 필수
+      // GIF URL은 별도 필드로 전송
       final response = await authProvider.createComment(
         widget.portfolioId,
         content,
         parentId: _replyingToCommentId,
+        gifImageUrl: _selectedGifUrl,
       );
 
       if (mounted) {
@@ -263,6 +313,7 @@ class _CommentModalState extends State<CommentModal> {
           setState(() {
             _replyingToCommentId = null;
             _replyingToUsername = null;
+            _selectedGifUrl = null; // GIF URL 초기화
             _commentAdded = true; // 댓글 작성 완료 표시
           });
           
@@ -291,6 +342,7 @@ class _CommentModalState extends State<CommentModal> {
       _replyingToCommentId = null;
       _replyingToUsername = null;
       _editingCommentId = null;
+      _selectedGifUrl = null; // GIF도 함께 초기화
     });
     _commentController.clear();
   }
@@ -385,6 +437,7 @@ class _CommentModalState extends State<CommentModal> {
   void _cancelEditComment() {
     setState(() {
       _editingCommentId = null;
+      _selectedGifUrl = null; // GIF도 함께 초기화
       _commentController.clear();
     });
   }
@@ -449,8 +502,8 @@ class _CommentModalState extends State<CommentModal> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                     child: Row(
                       children: [
-                        Icon(
-                          _snackBarIsError ? Icons.error_outline : Icons.check_circle_outline,
+                                        FaIcon(
+                          _snackBarIsError ? FontAwesomeIcons.circleExclamation : FontAwesomeIcons.circleCheck,
                           color: Colors.white,
                           size: 20,
                         ),
@@ -466,7 +519,7 @@ class _CommentModalState extends State<CommentModal> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                          icon: const FaIcon(FontAwesomeIcons.xmark, color: Colors.white, size: 18),
                           onPressed: () {
                             setState(() {
                               _snackBarMessage = null;
@@ -510,7 +563,7 @@ class _CommentModalState extends State<CommentModal> {
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.close, size: 22),
+                icon: const FaIcon(FontAwesomeIcons.xmark, size: 22),
                 onPressed: () => Navigator.of(context).pop(_commentAdded),
               ),
             ],
@@ -525,7 +578,7 @@ class _CommentModalState extends State<CommentModal> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey.shade700),
+        FaIcon(FontAwesomeIcons.comment, size: 48, color: Colors.grey.shade700),
         const SizedBox(height: 16),
         const Text(
           '첫 번째 댓글을 남겨보세요!',
@@ -651,7 +704,7 @@ class _CommentModalState extends State<CommentModal> {
                         ),
                         if (comment.isPinned) ...[
                           const SizedBox(width: 8),
-                          const Icon(Icons.push_pin, size: 12, color: Colors.redAccent),
+                          const FaIcon(FontAwesomeIcons.thumbtack, size: 12, color: Colors.redAccent),
                         ],
                         // 포트폴리오 작성자만 고정 버튼 표시
                         if (isPortfolioOwner) ...[
@@ -660,8 +713,8 @@ class _CommentModalState extends State<CommentModal> {
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             visualDensity: VisualDensity.compact,
-                            icon: Icon(
-                              comment.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                            icon: FaIcon(
+                              FontAwesomeIcons.thumbtack,
                               size: 16,
                               color: comment.isPinned ? Colors.redAccent : Colors.white,
                             ),
@@ -671,10 +724,50 @@ class _CommentModalState extends State<CommentModal> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      comment.content,
-                      style: const TextStyle(fontSize: 14, height: 1.4),
-                    ),
+                    // 댓글 내용 표시
+                    if (comment.content.isNotEmpty)
+                      Text(
+                        comment.content,
+                        style: const TextStyle(fontSize: 14, height: 1.4),
+                      ),
+                    // GIF 이미지 표시
+                    if (comment.gifImageUrl != null && comment.gifImageUrl!.isNotEmpty) ...[
+                      if (comment.content.isNotEmpty) const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          comment.gifImageUrl!,
+                          width: 200,
+                          height: 200,
+                          fit: BoxFit.contain, // GIF 전체를 보기 위해 contain 사용
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              width: 200,
+                              height: 200,
+                              color: Colors.grey.shade800,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 200,
+                              height: 200,
+                              color: Colors.grey.shade800,
+                              child: const FaIcon(FontAwesomeIcons.circleExclamation, color: Colors.red, size: 32),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -771,10 +864,50 @@ class _CommentModalState extends State<CommentModal> {
                 ],
               ),
               const SizedBox(height: 2),
-              Text(
-                reply.content,
-                style: const TextStyle(fontSize: 13, height: 1.4),
-              ),
+              // 대댓글 내용 표시
+              if (reply.content.isNotEmpty)
+                Text(
+                  reply.content,
+                  style: const TextStyle(fontSize: 13, height: 1.4),
+                ),
+              // GIF 이미지 표시
+              if (reply.gifImageUrl != null && reply.gifImageUrl!.isNotEmpty) ...[
+                if (reply.content.isNotEmpty) const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    reply.gifImageUrl!,
+                    width: 150,
+                    height: 150,
+                    fit: BoxFit.contain, // GIF 전체를 보기 위해 contain 사용
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        width: 150,
+                        height: 150,
+                        color: Colors.grey.shade800,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 150,
+                        height: 150,
+                        color: Colors.grey.shade800,
+                        child: const FaIcon(FontAwesomeIcons.circleExclamation, color: Colors.red, size: 24),
+                      );
+                    },
+                  ),
+                ),
+              ],
               // 본인 대댓글이고 대댓글이 없는 경우에만 수정 버튼 표시
               if (isReplyOwner && reply.repliesCount == 0) ...[
                 const SizedBox(height: 4),
@@ -799,7 +932,7 @@ class _CommentModalState extends State<CommentModal> {
       backgroundColor: Colors.grey.shade800,
       backgroundImage: url.isNotEmpty ? NetworkImage(url) : null,
       child: url.isEmpty
-          ? Icon(Icons.person, size: radius, color: Colors.grey.shade600)
+          ? FaIcon(FontAwesomeIcons.user, size: radius, color: Colors.grey.shade600)
           : null,
     );
   }
@@ -844,45 +977,117 @@ class _CommentModalState extends State<CommentModal> {
                         _cancelReply();
                       }
                     },
-                    child: const Icon(Icons.close, size: 16, color: Colors.blueAccent),
+                    child: const FaIcon(FontAwesomeIcons.xmark, size: 16, color: Colors.blueAccent),
                   ),
                 ],
               ),
             ),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildAvatar('', radius: 18), // 현재 사용자 아바타 (Provider에서 가져와야 함)
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _commentController,
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: '코멘트 남기기...',
-                    hintStyle: TextStyle(color: Colors.grey.shade600),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              // 선택한 GIF 미리보기
+              if (_selectedGifUrl != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          _selectedGifUrl!,
+                          width: 150,
+                          height: 150,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              width: 150,
+                              height: 150,
+                              color: Colors.grey.shade800,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 150,
+                              height: 150,
+                              color: Colors.grey.shade800,
+                              child: const FaIcon(FontAwesomeIcons.circleExclamation, color: Colors.red),
+                            );
+                          },
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: _removeGif,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const FaIcon(FontAwesomeIcons.xmark, size: 16, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  maxLines: 4,
-                  minLines: 1,
                 ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: _isTextEmpty ? null : _submitComment,
-                style: TextButton.styleFrom(
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  _editingCommentId != null ? '수정' : '게시',
-                  style: TextStyle(
-                    color: _isTextEmpty ? Colors.grey.shade700 : Colors.blueAccent,
-                    fontWeight: FontWeight.bold,
+              Row(
+                children: [
+                  _buildAvatar('', radius: 18), // 현재 사용자 아바타 (Provider에서 가져와야 함)
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _commentController,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: '코멘트 남기기...',
+                        hintStyle: TextStyle(color: Colors.grey.shade600),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                      maxLines: 4,
+                      minLines: 1,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // GIF 아이콘
+                  GestureDetector(
+                    onTap: _pickGif,
+                    child: FaIcon(
+                      FontAwesomeIcons.image, // GIF 아이콘은 image로 대체
+                      color: Colors.grey.shade500,
+                      size: 29,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: (_isTextEmpty && _selectedGifUrl == null) ? null : _submitComment,
+                    style: TextButton.styleFrom(
+                      minimumSize: Size.zero,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      _editingCommentId != null ? '수정' : '게시',
+                      style: TextStyle(
+                        color: (_isTextEmpty && _selectedGifUrl == null) ? Colors.grey.shade700 : Colors.blueAccent,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

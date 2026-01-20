@@ -311,7 +311,7 @@ class AuthProvider with ChangeNotifier {
       debugPrint('=== 사업자 추가정보 등록 성공 ===');
       return {
         'success': true,
-        'message': response.message ?? '사업자 정보가 등록되었습니다.',
+        'message': response.message.isNotEmpty ? response.message : '사업자 정보가 등록되었습니다.',
       };
     } catch (e) {
       _setLoading(false);
@@ -382,8 +382,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   // 댓글 작성
-  Future<ApiResponse<Comment>> createComment(int portfolioId, String content, {int? parentId}) async {
-    return await _authService.createComment(portfolioId, content, parentId: parentId);
+  Future<ApiResponse<Comment>> createComment(int portfolioId, String content, {int? parentId, String? gifImageUrl}) async {
+    return await _authService.createComment(portfolioId, content, parentId: parentId, gifImageUrl: gifImageUrl);
   }
 
   // 댓글 수정

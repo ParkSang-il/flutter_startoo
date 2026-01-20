@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../model/FeedModel.dart';
-import 'package:carousel_slider/carousel_slider.dart';
 import '../image_detail_screen.dart';
 import '../../../utils/tag_helper.dart';
 import '../../../utils/number_formatter.dart';
@@ -10,6 +11,9 @@ import '../../../providers/auth_provider.dart';
 import '../../../utils/snackbar_helper.dart';
 import 'comment_modal.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:video_player/video_player.dart';
+import 'package:visibility_detector/visibility_detector.dart';
+import '../../../models/portfolio_model.dart';
 
 class FeedItem extends StatefulWidget {
   final FeedModel feed;
@@ -20,7 +24,7 @@ class FeedItem extends StatefulWidget {
   State<FeedItem> createState() => _FeedItemState();
 }
 
-class _FeedItemState extends State<FeedItem> {
+class _FeedItemState extends State<FeedItem> with AutomaticKeepAliveClientMixin {
   bool _isExpanded = false;
   static const int _maxLines = 3; // 최대 표시 줄 수
   bool _isLiked = false;
@@ -29,12 +33,143 @@ class _FeedItemState extends State<FeedItem> {
   Map<int, double> _imageAspectRatios = {}; // 이미지 인덱스별 비율 저장
   Map<int, bool> _imageLoaded = {}; // 이미지 로드 상태 저장
   Map<int, bool> _imageError = {}; // 이미지 에러 상태 저장
+  Map<int, VideoPlayerController?> _videoControllers = {}; // 비디오 컨트롤러 저장
+  Map<int, bool> _videoInitialized = {}; // 비디오 초기화 상태 저장
+  Map<int, bool> _videoVisible = {}; // 비디오 가시성 상태 저장
+  Map<int, int> _videoRetryCount = {}; // 비디오 재시도 횟수 저장
+  int? _currentPlayingVideoIndex; // 현재 재생 중인 비디오 인덱스
 
   @override
   void initState() {
     super.initState();
     _isLiked = widget.feed.isLiked;
     _likesCount = widget.feed.likes;
+    
+    // 비디오 자동 재생 초기화
+    _initializeVideos();
+  }
+
+  @override
+  void dispose() {
+    // 비디오 컨트롤러 정리
+    for (var controller in _videoControllers.values) {
+      controller?.dispose();
+    }
+    _videoControllers.clear();
+    super.dispose();
+  }
+
+  // 비디오 초기화 및 자동 재생
+  void _initializeVideos() {
+    for (int i = 0; i < widget.feed.media.length; i++) {
+      final media = widget.feed.media[i];
+      if (media.isVideo && media.isVideoComplete) {
+        // video_status가 complete인 경우에만 비디오 초기화
+        // video_url이 있으면 HLS URL(m3u8) 또는 일반 비디오 URL로 사용
+        // video_url이 없으면 video_file_path 사용
+        final videoUrl = media.videoUrl ?? media.videoFilePath;
+        if (videoUrl != null) {
+          _initializeVideo(i, videoUrl);
+        }
+      }
+    }
+  }
+
+  Future<void> _initializeVideo(int index, String? videoUrl, {int retryCount = 0}) async {
+    if (videoUrl == null || videoUrl.isEmpty) {
+      return;
+    }
+
+    // 최대 2회 재시도
+    if (retryCount > 2) {
+      debugPrint('비디오 초기화 실패: 최대 재시도 횟수 초과');
+      if (mounted) {
+        setState(() {
+          _videoInitialized[index] = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      // 비디오 URL 구성
+      String fullVideoUrl = videoUrl;
+      
+      // HLS URL (m3u8) 또는 전체 URL인 경우 그대로 사용
+      // video_url은 콜백 후 HLS 형식으로 들어옴:
+      // https://yypo7c7k13595.edge.naverncp.com/hls/.../index.m3u8
+      if (!videoUrl.startsWith('http')) {
+        // 상대 경로인 경우 (video_file_path 사용 시)
+        // startoo-vod 버킷 URL 구성
+        final path = videoUrl.startsWith('/') ? videoUrl : '/$videoUrl';
+        fullVideoUrl = 'https://kr.object.ncloudstorage.com/startoo-vod$path';
+      }
+
+      // 이전 컨트롤러가 있으면 정리
+      final existingController = _videoControllers[index];
+      if (existingController != null) {
+        try {
+          await existingController.dispose();
+        } catch (e) {
+          debugPrint('기존 컨트롤러 정리 중 에러: $e');
+        }
+        _videoControllers.remove(index);
+      }
+
+      // video_player는 HLS URL(.m3u8)을 자동으로 인식하여 처리
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(fullVideoUrl),
+        videoPlayerOptions: VideoPlayerOptions(
+          mixWithOthers: true,
+          allowBackgroundPlayback: false,
+        ),
+      );
+      
+      // 타임아웃 설정 (30초)
+      await controller.initialize().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          controller.dispose();
+          throw TimeoutException('비디오 초기화 타임아웃');
+        },
+      );
+      
+      if (mounted) {
+        setState(() {
+          _videoControllers[index] = controller;
+          _videoInitialized[index] = true;
+          _videoRetryCount[index] = retryCount;
+        });
+        // 초기화만 하고 재생은 하지 않음 (가시성 감지 후 재생)
+        controller.setLooping(true);
+      }
+    } catch (e) {
+      debugPrint('비디오 초기화 에러 (재시도 $retryCount/2): $e');
+      debugPrint('비디오 URL: $videoUrl');
+      
+      // 에러 발생 시 컨트롤러 정리
+      final existingController = _videoControllers[index];
+      if (existingController != null) {
+        try {
+          await existingController.dispose();
+        } catch (disposeError) {
+          debugPrint('에러 발생 후 컨트롤러 정리 중 에러: $disposeError');
+        }
+        _videoControllers.remove(index);
+      }
+      
+      if (mounted) {
+        setState(() {
+          _videoInitialized[index] = false;
+        });
+        
+        // 재시도 (1초 대기 후)
+        if (retryCount < 2) {
+          await Future.delayed(const Duration(seconds: 1));
+          _initializeVideo(index, videoUrl, retryCount: retryCount + 1);
+        }
+      }
+    }
   }
 
   Future<void> _toggleLike() async {
@@ -94,7 +229,7 @@ class _FeedItemState extends State<FeedItem> {
               // 신고하기 버튼 (본인 포트폴리오가 아닌 경우에만 표시)
               if (!isOwnPortfolio) ...[
                 ListTile(
-                  leading: const Icon(Icons.flag_outlined, color: Colors.red, size: 24),
+                  leading: const FaIcon(FontAwesomeIcons.flag, color: Colors.red, size: 24),
                   title: const Text(
                     '신고하기',
                     style: TextStyle(
@@ -112,7 +247,7 @@ class _FeedItemState extends State<FeedItem> {
               ],
               // 취소 버튼
               ListTile(
-                leading: const Icon(Icons.close, color: Colors.grey, size: 24),
+                leading: const FaIcon(FontAwesomeIcons.xmark, color: Colors.grey, size: 24),
                 title: const Text(
                   '취소',
                   style: TextStyle(
@@ -185,7 +320,11 @@ class _FeedItemState extends State<FeedItem> {
   }
 
   @override
+  bool get wantKeepAlive => false; // 스크롤 밖 위젯은 dispose하여 메모리 절약
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin을 위해 필요
     final colorOnSurface = Theme.of(context).colorScheme.onSurface;
     final caption = widget.feed.caption;
     final needsExpansion = _needsExpansion(caption);
@@ -244,7 +383,7 @@ class _FeedItemState extends State<FeedItem> {
               ),
                       GestureDetector(
                         onTap: () => _showMoreMenu(context),
-                        child: Icon(Icons.more_horiz, color: Colors.grey.shade500),
+                        child: FaIcon(FontAwesomeIcons.ellipsis, color: Colors.grey.shade500),
                       ),
                     ],
                   ),
@@ -275,10 +414,10 @@ class _FeedItemState extends State<FeedItem> {
                                     ),
                                   ),
                                   const SizedBox(width: 4),
-                                  Icon(
+                                  FaIcon(
                                     _isExpanded
-                                        ? Icons.expand_less
-                                        : Icons.expand_more,
+                                        ? FontAwesomeIcons.chevronUp
+                                        : FontAwesomeIcons.chevronDown,
                                     size: 16,
                                     color: Colors.grey.shade400,
                                   ),
@@ -291,11 +430,11 @@ class _FeedItemState extends State<FeedItem> {
                   ),
                   const SizedBox(height: 8),
 
-                  // 3. 이미지 섹션
-                  if (widget.feed.postImages.isNotEmpty)
+                  // 3. 미디어 섹션 (이미지 + 비디오)
+                  if (widget.feed.media.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8.0),
-                      child: _buildFlexibleImageSection(),
+                      child: _buildFlexibleMediaSection(),
                     ),
 
                   // 4. 액션 버튼
@@ -303,8 +442,8 @@ class _FeedItemState extends State<FeedItem> {
                 children: [
                       _buildLikeButton(),
                       _buildCommentButton(),
-                      _buildActionButton(Icons.repeat),
-                      _buildActionButton(Icons.send_outlined),
+                      _buildActionButton(FontAwesomeIcons.repeat),
+                      _buildActionButton(FontAwesomeIcons.paperPlane),
                     ],
                   ),
                 ],
@@ -368,8 +507,8 @@ class _FeedItemState extends State<FeedItem> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : Icon(
-                    _isLiked ? Icons.favorite : Icons.favorite_border,
+                : FaIcon(
+                    FontAwesomeIcons.heart,
                     size: 22,
                     color: _isLiked ? Colors.red : Colors.white,
                   ),
@@ -413,7 +552,7 @@ class _FeedItemState extends State<FeedItem> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.mode_comment_outlined, size: 22, color: Colors.white),
+            FaIcon(FontAwesomeIcons.comment, size: 22, color: Colors.white),
             const SizedBox(width: 4),
               Text(
               NumberFormatter.formatCount(widget.feed.comments),
@@ -436,17 +575,39 @@ class _FeedItemState extends State<FeedItem> {
     );
   }
 
-  // 이미지 섹션 빌더 (단일/다중 이미지 통합)
-  Widget _buildFlexibleImageSection() {
-    final List<String> images = widget.feed.postImages;
+  // 미디어 섹션 빌더 (이미지 + 비디오 통합)
+  Widget _buildFlexibleMediaSection() {
+    final media = widget.feed.media;
 
-    // 1. 이미지가 하나일 때
-    if (images.length == 1) {
-      return _buildSingleImage(images.first);
+    // 1. 미디어가 하나일 때
+    if (media.length == 1) {
+      return _buildSingleMedia(media.first);
     }
 
-    // 2. 이미지가 여러 개일 때 (가로 사이즈 가변형)
-    return _buildVariableWidthSlider(images);
+    // 2. 미디어가 여러 개일 때 (가로 사이즈 가변형)
+    return _buildVariableWidthMediaSlider(media);
+  }
+
+  // 단일 미디어 (이미지 또는 비디오)
+  Widget _buildSingleMedia(portfolioMedia) {
+    if (portfolioMedia.isVideo) {
+      return _buildSingleVideo(portfolioMedia, 0);
+    } else {
+      return _buildSingleImage(portfolioMedia.imageUrl ?? '');
+    }
+  }
+
+  // 단일 비디오
+  Widget _buildSingleVideo(portfolioMedia, int index) {
+    double videoRatio = 0.8; // 기본 세로형 비율
+
+    return AspectRatio(
+      aspectRatio: videoRatio,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: _buildVideoPlayer(index, portfolioMedia),
+      ),
+    );
   }
 
   // 단일 이미지: 비율에 따라 박스 크기 변경
@@ -459,10 +620,11 @@ class _FeedItemState extends State<FeedItem> {
       aspectRatio: imageRatio,
       child: GestureDetector(
         onTap: () {
+          // mediaList를 전달하여 이미지와 비디오 모두 포함
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => ImageDetailScreen(
-                imageUrls: widget.feed.postImages,
+                mediaList: widget.feed.media,
                 initialIndex: 0,
               ),
             ),
@@ -479,7 +641,357 @@ class _FeedItemState extends State<FeedItem> {
     );
   }
 
-  // 다중 이미지: 높이 고정, 너비 가변
+  // 다중 미디어: 높이 고정, 너비 가변 (이미지 + 비디오)
+  Widget _buildVariableWidthMediaSlider(List media) {
+    // 최대 높이 설정 (한 번만 계산)
+    final screenWidth = MediaQuery.of(context).size.width;
+    final double maxHeight = screenWidth * 0.8;
+    
+    // 가로형/세로형 이미지에 대한 고정 비율
+    const double landscapeRatio = 0.9;
+    const double portraitRatio = 0.7;
+
+    return SizedBox(
+      height: maxHeight,
+      child: ClipRect(
+        clipper: RightSideNoneClipper(),
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          itemCount: media.length,
+          physics: const BouncingScrollPhysics(),
+          clipBehavior: Clip.none,
+          cacheExtent: 500,
+          addAutomaticKeepAlives: false,
+          addRepaintBoundaries: true,
+          itemBuilder: (context, index) {
+            final mediaItem = media[index];
+            double fixedRatio = 0.8;
+            
+            if (mediaItem.isImage) {
+              final originalRatio = _imageAspectRatios[index] ?? 0.8;
+              fixedRatio = originalRatio > 1.0 ? landscapeRatio : portraitRatio;
+            } else {
+              fixedRatio = portraitRatio; // 비디오는 세로형 비율
+            }
+            
+            final calculatedWidth = maxHeight * fixedRatio;
+
+            return GestureDetector(
+              onTap: () {
+                // 이미지 또는 비디오 상세 화면으로 이동 (모든 미디어 포함)
+                final mediaList = List<PortfolioMedia>.from(media);
+                final mediaIndex = mediaList.indexOf(mediaItem);
+                
+                if (mediaIndex >= 0) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ImageDetailScreen(
+                        mediaList: mediaList,
+                        initialIndex: mediaIndex,
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                margin: const EdgeInsets.only(right: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: SizedBox(
+                    width: calculatedWidth,
+                    height: maxHeight,
+                    child: mediaItem.isVideo
+                        ? _buildVideoPlayer(index, mediaItem)
+                        : _buildImageWithRatioDetection(
+                            mediaItem.imageUrl ?? '',
+                            index,
+                          ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // 비디오 플레이어 위젯
+  Widget _buildVideoPlayer(int index, portfolioMedia) {
+    // 비디오 상태 확인
+    final isEncoding = portfolioMedia.isVideoEncoding;
+    
+    // 인코딩 중인 경우
+    if (isEncoding) {
+      return _buildEncodingIndicator(portfolioMedia);
+    }
+
+    // 비디오 썸네일이 있으면 먼저 표시
+    final thumbnailUrl = portfolioMedia.videoThumbnailUrl;
+    final hasThumbnail = thumbnailUrl != null && thumbnailUrl.isNotEmpty;
+
+    if ((_videoInitialized[index] ?? false) == false) {
+      // 비디오 초기화 중 - 스켈레톤 UI 표시
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          // 스켈레톤 UI
+          _buildSkeleton(),
+          // 썸네일이 있으면 표시 (로딩 중 스켈레톤 위에)
+          if (hasThumbnail)
+            Image.network(
+              thumbnailUrl!.startsWith('http')
+                  ? thumbnailUrl
+                  : 'https://kr.object.ncloudstorage.com/startoo-vod${thumbnailUrl.startsWith('/') ? thumbnailUrl : '/$thumbnailUrl'}',
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                // 썸네일 로딩 중이면 스켈레톤 유지
+                if (loadingProgress == null) {
+                  return child;
+                }
+                return const SizedBox.shrink();
+              },
+              errorBuilder: (context, error, stackTrace) {
+                // 에러 시 스켈레톤만 표시
+                return const SizedBox.shrink();
+              },
+            ),
+          // 비디오 타입 표시
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'VIDEO',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final controller = _videoControllers[index];
+    if (controller == null || !controller.value.isInitialized) {
+      // 비디오 초기화 실패 - 썸네일 표시
+      return Container(
+        color: Colors.black,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (hasThumbnail)
+              Image.network(
+                thumbnailUrl!.startsWith('http')
+                    ? thumbnailUrl
+                    : 'https://kr.object.ncloudstorage.com/startoo-vod${thumbnailUrl.startsWith('/') ? thumbnailUrl : '/$thumbnailUrl'}',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.black,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          FaIcon(FontAwesomeIcons.videoSlash, color: Colors.white, size: 48),
+                          SizedBox(height: 8),
+                          Text(
+                            '비디오를 재생할 수 없습니다',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              )
+            else
+              Container(
+                color: Colors.black,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      FaIcon(FontAwesomeIcons.videoSlash, color: Colors.white, size: 48),
+                      SizedBox(height: 8),
+                      Text(
+                        '비디오를 재생할 수 없습니다',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            // 비디오 타입 표시
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'VIDEO',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return VisibilityDetector(
+      key: Key('video_${widget.feed.portfolioId}_$index'),
+      onVisibilityChanged: (VisibilityInfo info) {
+        final isVisible = info.visibleFraction > 0.5; // 50% 이상 보일 때만 재생
+        
+        if (mounted) {
+          setState(() {
+            _videoVisible[index] = isVisible;
+          });
+          
+          if (isVisible) {
+            // 다른 비디오가 재생 중이면 일시정지
+            if (_currentPlayingVideoIndex != null && _currentPlayingVideoIndex != index) {
+              final otherController = _videoControllers[_currentPlayingVideoIndex];
+              if (otherController != null && otherController.value.isPlaying) {
+                otherController.pause();
+              }
+            }
+            // 현재 비디오 재생
+            if (controller.value.isInitialized && !controller.value.isPlaying) {
+              controller.play();
+              _currentPlayingVideoIndex = index;
+            }
+          } else {
+            // 화면에서 벗어나면 일시정지
+            if (controller.value.isPlaying) {
+              controller.pause();
+            }
+            if (_currentPlayingVideoIndex == index) {
+              _currentPlayingVideoIndex = null;
+            }
+          }
+        }
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 비디오 플레이어 (레이아웃에 맞게 자르기)
+          SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: controller.value.size.width,
+                height: controller.value.size.height,
+                child: VideoPlayer(controller),
+              ),
+            ),
+          ),
+          // 비디오 타입 표시
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'VIDEO',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 인코딩 중 표시 위젯
+  Widget _buildEncodingIndicator(portfolioMedia) {
+    final thumbnailUrl = portfolioMedia.videoThumbnailUrl;
+    final hasThumbnail = thumbnailUrl != null && thumbnailUrl.isNotEmpty;
+
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 썸네일 표시 (있는 경우)
+          if (hasThumbnail)
+            Image.network(
+              thumbnailUrl!.startsWith('http')
+                  ? thumbnailUrl
+                  : 'https://kr.object.ncloudstorage.com/startoo-vod${thumbnailUrl.startsWith('/') ? thumbnailUrl : '/$thumbnailUrl'}',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(color: Colors.black);
+              },
+            )
+          else
+            Container(color: Colors.black),
+          // 인코딩 중 오버레이
+          Container(
+            color: Colors.black.withOpacity(0.6),
+            child: Center(
+              child: Text(
+                '인코딩 중...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+          // 비디오 타입 표시
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'VIDEO',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 다중 이미지: 높이 고정, 너비 가변 (하위 호환성) - 사용되지 않음
+  // ignore: unused_element
   Widget _buildVariableWidthSlider(List<String> images) {
     // 최대 높이 설정 (한 번만 계산)
     final screenWidth = MediaQuery.of(context).size.width;
@@ -545,15 +1057,15 @@ class _FeedItemState extends State<FeedItem> {
     if (_imageError[index] ?? false) {
       return Container(
         color: Colors.grey.shade800,
-        child: Icon(
-          Icons.broken_image,
+        child: FaIcon(
+          FontAwesomeIcons.image,
           color: Colors.grey.shade600,
           size: 40,
         ),
       );
     }
 
-    // 피드 이미지 URL 생성 (너비 300)
+    // 피드 이미지 URL 생성 (너비 500)
     final feedImageUrl = ImageUrlHelper.buildFeedImageUrl(imageUrl);
 
     // 비율이 아직 계산되지 않았으면 이미지를 로드하면서 비율 감지
@@ -562,6 +1074,7 @@ class _FeedItemState extends State<FeedItem> {
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
+      cacheWidth: 1000, // 메모리 최적화: 최대 1000px 너비로 디코딩
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
         // 프레임이 있고 비율이 아직 계산되지 않았을 때만 계산
         if (frame != null && !_imageAspectRatios.containsKey(index)) {
@@ -621,8 +1134,8 @@ class _FeedItemState extends State<FeedItem> {
         }
         return Container(
           color: Colors.grey.shade800,
-          child: Icon(
-            Icons.broken_image,
+          child: FaIcon(
+            FontAwesomeIcons.image,
             color: Colors.grey.shade600,
             size: 40,
           ),
@@ -648,8 +1161,8 @@ class _FeedItemState extends State<FeedItem> {
     if (_imageError[index] ?? false) {
       return Container(
         color: Colors.grey.shade800,
-        child: Icon(
-          Icons.broken_image,
+        child: FaIcon(
+          FontAwesomeIcons.image,
           color: Colors.grey.shade600,
           size: 40,
         ),
@@ -693,8 +1206,8 @@ class _FeedItemState extends State<FeedItem> {
         }
         return Container(
           color: Colors.grey.shade800,
-          child: Icon(
-            Icons.broken_image,
+          child: FaIcon(
+            FontAwesomeIcons.image,
             color: Colors.grey.shade600,
             size: 40,
           ),

@@ -195,7 +195,8 @@ class _CreateScreenState extends State<CreateScreen> {
         } else {
           // 이미지 파일 경로 생성 (업로드하지 않음)
           final fileName = path.basename(mediaItem.file.path);
-          final filePath = _storageService.generateImagePath(fileName);
+          // 각 이미지마다 고유한 파일명 생성 (imageOrder를 인덱스로 사용)
+          final filePath = _storageService.generateImagePath(fileName, index: imageOrder);
 
           // 비디오가 먼저 있으면 image_order는 1부터 시작
           final currentImageOrder = hasVideoBefore ? imageOrder + 1 : imageOrder;

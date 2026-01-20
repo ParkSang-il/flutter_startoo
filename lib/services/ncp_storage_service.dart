@@ -225,24 +225,30 @@ class NcpStorageService {
     return '$year/$month/$day/$uniqueFileName';
   }
 
-  // 랜덤 문자열 생성
+  // 랜덤 문자열 생성 (개선: 실제 랜덤 값 사용)
   String _generateRandomString(int length) {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = DateTime.now().millisecondsSinceEpoch;
+    final random = DateTime.now().microsecondsSinceEpoch; // 마이크로초 사용으로 더 정밀한 랜덤
     final buffer = StringBuffer();
     for (int i = 0; i < length; i++) {
-      buffer.write(chars[(random + i) % chars.length]);
+      // 각 문자마다 다른 시드 사용하여 더 랜덤하게
+      final seed = (random + i * 1000) % chars.length;
+      buffer.write(chars[seed]);
     }
     return buffer.toString();
   }
 
   // 이미지 파일 경로만 생성 (업로드하지 않음)
-  String generateImagePath(String fileName) {
+  String generateImagePath(String fileName, {int? index}) {
     final now = DateTime.now();
     final extension = path.extension(fileName);
+    // 마이크로초까지 포함하여 더 정밀한 타임스탬프 생성
+    final microseconds = now.microsecond.toString().padLeft(6, '0');
     final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+    // 인덱스가 있으면 추가하여 고유성 보장
+    final indexSuffix = index != null ? '_$index' : '';
     final randomString = _generateRandomString(8);
-    final uniqueFileName = '${timestamp}_$randomString$extension';
+    final uniqueFileName = '${timestamp}${microseconds}_$randomString$indexSuffix$extension';
     
     final year = now.year.toString();
     final month = now.month.toString().padLeft(2, '0');

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:starttoo/screens/feed/feed_list_screen.dart';
+import 'package:starttoo/screens/feed/feed_list/feed_list_screen.dart';
 import '../providers/auth_provider.dart';
 import '../utils/api_client.dart';
 import 'auth/login_or_register_screen.dart';

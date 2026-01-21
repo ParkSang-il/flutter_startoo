@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../screens/feed/feed_list_screen.dart';
-import 'register_screen.dart';
+import '../../screens/feed/feed_list/feed_list_screen.dart';
+import 'register/register_screen.dart';
 
 class UserTypeSelectionScreen extends StatelessWidget {
   const UserTypeSelectionScreen({super.key});

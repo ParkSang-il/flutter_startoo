@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../model/FeedModel.dart';
-import '../image_detail_screen.dart';
+import '../image_detail/image_detail_screen.dart';
 import '../../../utils/tag_helper.dart';
 import '../../../utils/number_formatter.dart';
 import '../../../utils/image_url_helper.dart';
@@ -39,6 +39,46 @@ class _FeedItemState extends State<FeedItem> with AutomaticKeepAliveClientMixin 
   Map<int, int> _videoRetryCount = {}; // 비디오 재시도 횟수 저장
   int? _currentPlayingVideoIndex; // 현재 재생 중인 비디오 인덱스
 
+  // 피드 전체에서 "현재 재생 중인 비디오"를 1개로 제한하기 위한 전역 상태
+  static String? _globalPlayingKey;
+  static VideoPlayerController? _globalPlayingController;
+
+  void _requestGlobalPlay(String key, VideoPlayerController controller) {
+    // 이미 같은 컨트롤러/키면 그대로
+    if (_globalPlayingController == controller && _globalPlayingKey == key) {
+      if (!controller.value.isPlaying) {
+        controller.play();
+      }
+      return;
+    }
+
+    // 다른 비디오가 재생 중이면 무조건 중단
+    final prev = _globalPlayingController;
+    if (prev != null) {
+      try {
+        if (prev.value.isInitialized && prev.value.isPlaying) {
+          prev.pause();
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    _globalPlayingController = controller;
+    _globalPlayingKey = key;
+
+    if (controller.value.isInitialized && !controller.value.isPlaying) {
+      controller.play();
+    }
+  }
+
+  void _releaseGlobalIfCurrent(VideoPlayerController controller) {
+    if (_globalPlayingController == controller) {
+      _globalPlayingController = null;
+      _globalPlayingKey = null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +93,17 @@ class _FeedItemState extends State<FeedItem> with AutomaticKeepAliveClientMixin 
   void dispose() {
     // 비디오 컨트롤러 정리
     for (var controller in _videoControllers.values) {
+      if (controller != null) {
+        // 이 FeedItem이 전역 재생 중인 컨트롤러를 들고 있었다면 해제
+        _releaseGlobalIfCurrent(controller);
+        try {
+          if (controller.value.isInitialized && controller.value.isPlaying) {
+            controller.pause();
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
       controller?.dispose();
     }
     _videoControllers.clear();
@@ -858,7 +909,7 @@ class _FeedItemState extends State<FeedItem> with AutomaticKeepAliveClientMixin 
     return VisibilityDetector(
       key: Key('video_${widget.feed.portfolioId}_$index'),
       onVisibilityChanged: (VisibilityInfo info) {
-        final isVisible = info.visibleFraction > 0.5; // 50% 이상 보일 때만 재생
+        final isVisible = info.visibleFraction > 0.8; // 50% 이상 보일 때만 재생
         
         if (mounted) {
           setState(() {
@@ -866,16 +917,10 @@ class _FeedItemState extends State<FeedItem> with AutomaticKeepAliveClientMixin 
           });
           
           if (isVisible) {
-            // 다른 비디오가 재생 중이면 일시정지
-            if (_currentPlayingVideoIndex != null && _currentPlayingVideoIndex != index) {
-              final otherController = _videoControllers[_currentPlayingVideoIndex];
-              if (otherController != null && otherController.value.isPlaying) {
-                otherController.pause();
-              }
-            }
-            // 현재 비디오 재생
-            if (controller.value.isInitialized && !controller.value.isPlaying) {
-              controller.play();
+            // 피드 전체에서 1개만 재생되도록 전역 재생 요청
+            if (controller.value.isInitialized) {
+              final playKey = 'video_${widget.feed.portfolioId}_$index';
+              _requestGlobalPlay(playKey, controller);
               _currentPlayingVideoIndex = index;
             }
           } else {
@@ -886,6 +931,8 @@ class _FeedItemState extends State<FeedItem> with AutomaticKeepAliveClientMixin 
             if (_currentPlayingVideoIndex == index) {
               _currentPlayingVideoIndex = null;
             }
+            // 전역 재생 중인 컨트롤러가 이 컨트롤러면 해제
+            _releaseGlobalIfCurrent(controller);
           }
         }
       },

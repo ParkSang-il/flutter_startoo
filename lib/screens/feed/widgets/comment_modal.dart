@@ -449,14 +449,20 @@ class _CommentModalState extends State<CommentModal> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
-        return Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF121212), // 다크 테마 배경색
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
+        return GestureDetector(
+          onTap: () {
+            // 키보드 외 영역 터치 시 키보드 숨김
+            FocusScope.of(context).unfocus();
+          },
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF121212), // 다크 테마 배경색
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Column(
                 children: [
                   // 1. 상단 그랩 바 & 헤더
                   _buildHeader(),
@@ -534,6 +540,7 @@ class _CommentModalState extends State<CommentModal> {
                 ),
               ),
           ],
+        ),
         );
       },
     );

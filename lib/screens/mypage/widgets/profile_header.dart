@@ -18,6 +18,7 @@ class _ProfileHeaderState extends State<ProfileHeader> {
   UserProfileData? _userProfileData;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isBioExpanded = false; // 사업자 소개(인라인 더보기/접기)
 
   @override
   void initState() {
@@ -107,177 +108,463 @@ class _ProfileHeaderState extends State<ProfileHeader> {
       coverImageUrl = null; // 빈 문자열이면 null로 처리하여 플레이스홀더 표시
     }
 
-    // 스튜디오 주소
-    final String? studioAddress = artistProfile?.studioAddress ?? 
-        (businessVerification != null && businessVerification.address != null && businessVerification.addressDetail != null
+    // 사업자 정보 (헤더 하단 섹션으로 이동)
+    final String? bio = artistProfile?.bio;
+    final String? studioAddress = artistProfile?.studioAddress ??
+        (businessVerification != null &&
+                businessVerification.address != null &&
+                businessVerification.addressDetail != null
             ? '${businessVerification.address} ${businessVerification.addressDetail}'
             : businessVerification?.address);
 
-    // 작업가능 지역
-    final String? availableRegions = businessVerification != null && businessVerification.availableRegions.isNotEmpty
-        ? businessVerification.availableRegions.join(', ')
-        : null;
+    final List<String> availableRegions = businessVerification?.availableRegions ?? const [];
+    final List<String> mainStyles = businessVerification?.mainStyles ?? const [];
+    final String? businessName = businessVerification?.businessName;
 
-    // 작업가능 스타일
-    final String? availableStyles = businessVerification != null && businessVerification.mainStyles.isNotEmpty
-        ? businessVerification.mainStyles.join(', ')
-        : null;
+    final headerHeight = 350.0; // 고정 헤더 높이
+    final avatarRadius = 46.0;
+    const statsBarHeight = 80.0;
+
+    return Column(
+      children: [
+        // ===== 헤더(커버+그라데이션+프로필+이름+통계) =====
+        SizedBox(
+          height: headerHeight,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 커버 이미지
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade800,
+                  image: coverImageUrl != null && coverImageUrl.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(coverImageUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: coverImageUrl == null || coverImageUrl.isEmpty
+                    ? Center(
+                        child: FaIcon(
+                          FontAwesomeIcons.image,
+                          size: 60,
+                          color: Colors.grey.shade600,
+                        ),
+                      )
+                    : null,
+              ),
+              // 그라데이션 오버레이 (상단은 투명, 하단은 진하게)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.10),
+                      Colors.black.withOpacity(0.20),
+                      Colors.black.withOpacity(0.35),
+                    ],
+                  ),
+                ),
+              ),
+              // 프로필 + 텍스트 (가운데 정렬) - 통계 바는 패딩 영향 받지 않도록 별도 배치
+              Transform.translate(
+                offset: const Offset(0, -50), // 프로필/이름을 살짝 위로
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    // 통계 바는 Stack 하단에 고정 배치하므로, 내용은 그 위까지만 사용
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, statsBarHeight + 8),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                      // 프로필 이미지
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1), // 그림자 색상과 투명도
+                              spreadRadius: 10,  // 그림자가 퍼지는 범위
+                              blurRadius: 5,    // 그림자의 흐림 정도
+                              offset: Offset(0, 0), // 그림자의 위치 (x축, y축)
+                            ),
+                          ],
+                        ),
+                        child: CircleAvatar(
+                          radius: avatarRadius,
+                          backgroundColor: Colors.grey.shade800,
+                          backgroundImage: (user.profileImage != null && user.profileImage!.isNotEmpty)
+                              ? NetworkImage(ImageUrlHelper.buildGeneralImageUrl(user.profileImage))
+                              : null,
+                          child: (user.profileImage == null || user.profileImage!.isEmpty)
+                              ? FaIcon(FontAwesomeIcons.user, size: 40, color: Colors.grey.shade600)
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      // 이름(헤더에는 최소 정보만)
+                      Text(
+                        user.username,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 2,              // 그림자의 퍼짐 정도
+                              offset: Offset(0.3, 0.3),      // 그림자의 위치 (x, y)
+                            ),
+                          ]
+                        ),
+                      ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // 통계 3칸 (가로 전체 배경, 상위 horizontal padding 영향 X)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: -6, // 통계 영역을 살짝 아래로
+                child: Container(
+                  height: statsBarHeight,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  color: Colors.black.withOpacity(0.35),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildHeaderStat("FRIENDS", "0"), // TODO: 게시물 수 연결 시 교체
+                      _buildHeaderStat("FOLLOWING", followInfo.followingCount.toString()),
+                      _buildHeaderStat("FOLLOWER", followInfo.followerCount.toString()),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ===== 사업자 정보 섹션(헤더 밖) =====
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    FaIcon(FontAwesomeIcons.store, size: 16, color: colorScheme.onSurface.withOpacity(0.8)),
+                    const SizedBox(width: 8),
+                    Text(
+                      '소개',
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // 상호명
+                if (businessName != null && businessName.trim().isNotEmpty) ...[
+                  Text(
+                    businessName.trim(),
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
+                // 소개 (인라인 더보기/접기)
+                if (bio != null && bio.trim().isNotEmpty) ...[
+                  _buildExpandableBio(
+                    bio.trim(),
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // 주소
+                if (studioAddress != null && studioAddress.trim().isNotEmpty) ...[
+                  _buildInfoRow(
+                    icon: FontAwesomeIcons.locationDot,
+                    title: '스튜디오 주소',
+                    value: studioAddress.trim(),
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // 지역
+                if (availableRegions.isNotEmpty) ...[
+                  _buildChipSection(
+                    icon: FontAwesomeIcons.map,
+                    title: '작업가능 지역',
+                    items: availableRegions,
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // 스타일
+                if (mainStyles.isNotEmpty) ...[
+                  _buildChipSection(
+                    icon: FontAwesomeIcons.palette,
+                    title: '작업가능 스타일',
+                    items: mainStyles,
+                    colorScheme: colorScheme,
+                  ),
+                ],
+
+                const SizedBox(height: 14),
+                // 버튼
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {},
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade700),
+                        ),
+                        child: Text(
+                          '프로필 편집',
+                          style: TextStyle(color: colorScheme.onSurface),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {},
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade700),
+                        ),
+                        child: Text(
+                          '프로필 공유',
+                          style: TextStyle(color: colorScheme.onSurface),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderStat(String label, String count) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.75),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            count,
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpandableBio(String bio, {required ColorScheme colorScheme}) {
+    const collapsedMaxLines = 2;
+    final textStyle = TextStyle(
+      color: colorScheme.onSurface.withOpacity(0.75),
+      fontSize: 13,
+      height: 1.35,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: bio, style: textStyle),
+          maxLines: collapsedMaxLines,
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: constraints.maxWidth);
+        final isOverflow = painter.didExceedMaxLines;
+        final showToggle = isOverflow;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              bio,
+              maxLines: _isBioExpanded ? null : collapsedMaxLines,
+              overflow: _isBioExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              style: textStyle,
+            ),
+            if (showToggle) ...[
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isBioExpanded = !_isBioExpanded;
+                  });
+                },
+                child: Text(
+                  _isBioExpanded ? '접기' : '더보기',
+                  style: TextStyle(
+                    color: colorScheme.onSurface.withOpacity(0.9),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String title,
+    required String value,
+    required ColorScheme colorScheme,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FaIcon(icon, size: 16, color: colorScheme.onSurface.withOpacity(0.8)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: colorScheme.onSurface.withOpacity(0.65),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  color: colorScheme.onSurface.withOpacity(0.9),
+                  fontSize: 13,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChipSection({
+    required IconData icon,
+    required String title,
+    required List<String> items,
+    required ColorScheme colorScheme,
+  }) {
+    const maxShow = 8;
+    final showItems = items.take(maxShow).toList();
+    final moreCount = items.length - showItems.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 커버 이미지와 프로필 사진이 겹치는 부분
-        Stack(
-          clipBehavior: Clip.none,
+        Row(
           children: [
-            // 커버 이미지
-            Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade800,
-                image: coverImageUrl != null && coverImageUrl.isNotEmpty
-                    ? DecorationImage(
-                        image: NetworkImage(coverImageUrl),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
-              child: coverImageUrl == null || coverImageUrl.isEmpty
-                  ? Center(
-                      child: FaIcon(
-                        FontAwesomeIcons.image,
-                        size: 60,
-                        color: Colors.grey.shade600,
-                      ),
-                    )
-                  : null,
-            ),
-            // 프로필 사진 (커버 이미지와 50% 겹치게)
-            Positioned(
-              left: 16,
-              bottom: -40, // 프로필 사진의 50% (radius 40)가 커버 이미지와 겹치도록
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    width: 3,
-                  ),
-                ),
-                child: CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.grey.shade800,
-                  backgroundImage: (user.profileImage != null && user.profileImage!.isNotEmpty)
-                      ? NetworkImage(ImageUrlHelper.buildGeneralImageUrl(user.profileImage))
-                      : null,
-                  child: (user.profileImage == null || user.profileImage!.isEmpty)
-                      ? FaIcon(FontAwesomeIcons.user, size: 40, color: Colors.grey.shade600)
-                      : null,
-                ),
+            FaIcon(icon, size: 16, color: colorScheme.onSurface.withOpacity(0.8)),
+            const SizedBox(width: 10),
+            Text(
+              title,
+              style: TextStyle(
+                color: colorScheme.onSurface.withOpacity(0.65),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
-        Padding(
-          padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 10.0, bottom: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 통계 섹션 (가장 위로 배치)
-              Row(
-                children: [
-                  const SizedBox(width: 80), // 프로필 사진 너비만큼 공간 확보
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildStatColumn(context, "게시물", "0"),
-                        _buildStatColumn(context, "팔로워", followInfo.followerCount.toString()),
-                        _buildStatColumn(context, "팔로잉", followInfo.followingCount.toString()),
-                      ],
-                    ),
-                  )
-                ],
-              ),
-              const SizedBox(height: 12),
-              // 사용자 이름
-              Text(
-                user.username,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: colorScheme.onSurface,
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final t in showItems)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: colorScheme.onSurface.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: colorScheme.onSurface.withOpacity(0.08)),
+                ),
+                child: Text(
+                  t,
+                  style: TextStyle(
+                    color: colorScheme.onSurface.withOpacity(0.9),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              // 자기소개글
-              if (artistProfile != null && artistProfile.bio != null && artistProfile.bio!.isNotEmpty)
-                Text(
-                  artistProfile.bio!,
+            if (moreCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: colorScheme.onSurface.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: colorScheme.onSurface.withOpacity(0.08)),
+                ),
+                child: Text(
+                  '+$moreCount',
                   style: TextStyle(
                     color: colorScheme.onSurface.withOpacity(0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              const SizedBox(height: 8),
-              // 스튜디오 정보 섹션 (사업자회원만)
-              if (studioAddress != null || availableRegions != null || availableStyles != null)
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    if (studioAddress != null)
-                      _buildInfoIcon(
-                        context,
-                        icon: FontAwesomeIcons.locationDot,
-                        hint: '스튜디오 주소: $studioAddress',
-                      ),
-                    if (availableRegions != null)
-                      _buildInfoIcon(
-                        context,
-                        icon: FontAwesomeIcons.map,
-                        hint: '작업가능 지역: $availableRegions',
-                      ),
-                    if (availableStyles != null)
-                      _buildInfoIcon(
-                        context,
-                        icon: FontAwesomeIcons.palette,
-                        hint: '작업가능 스타일: $availableStyles',
-                      ),
-                  ],
-                ),
-              const SizedBox(height: 15),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.grey.shade700),
-                      ),
-                      child: Text(
-                        '프로필 편집',
-                        style: TextStyle(color: colorScheme.onSurface),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.grey.shade700),
-                      ),
-                      child: Text(
-                        '프로필 공유',
-                        style: TextStyle(color: colorScheme.onSurface),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            ],
-          ),
+              ),
+          ],
         ),
       ],
     );

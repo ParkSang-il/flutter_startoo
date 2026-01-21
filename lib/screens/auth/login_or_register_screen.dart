@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../widgets/custom_text_button.dart';
-import 'phone_input_screen.dart';
-import 'terms_agreement_screen.dart';
+import 'phone_input/phone_input_screen.dart';
+import 'terms_agreement/terms_agreement_screen.dart';
 
 class LoginOrRegisterScreen extends StatelessWidget {
   const LoginOrRegisterScreen({super.key});

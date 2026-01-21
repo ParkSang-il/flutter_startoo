@@ -116,13 +116,13 @@ class NcpStorageService {
   // 비디오 업로드 (startoo-vod 버킷)
   Future<String?> uploadVideo(File file, String fileName, {String? videoFileName}) async {
     try {
-      // mp4 확장자만 허용
+      // mp4와 mov 확장자 허용 (아이폰 동영상 지원)
       final extension = path.extension(fileName).toLowerCase();
-      if (extension != '.mp4') {
-        print('비디오는 mp4 확장자만 허용됩니다.');
+      if (extension != '.mp4' && extension != '.mov') {
+        print('비디오는 mp4 또는 mov 확장자만 허용됩니다.');
         return null;
       }
-
+      
       // videoFileName이 제공되면 사용, 아니면 새로 생성
       String finalObjectKey;
       if (videoFileName != null && videoFileName.isNotEmpty) {
@@ -157,7 +157,9 @@ class NcpStorageService {
       
       // 파일 읽기
       final fileBytes = await file.readAsBytes();
-      final contentType = 'video/mp4';
+      // 실제 파일 확장자에 따라 Content-Type 설정
+      final actualExtension = path.extension(file.path).toLowerCase();
+      final contentType = actualExtension == '.mov' ? 'video/quicktime' : 'video/mp4';
       
       // AWS Signature V4 생성 (Path-style: 버킷 이름을 URI에 포함)
       final headers = _generateHeaders(
@@ -239,7 +241,7 @@ class NcpStorageService {
   }
 
   // 이미지 파일 경로만 생성 (업로드하지 않음)
-  String generateImagePath(String fileName, {int? index}) {
+  String generateImagePath(String fileName, {int? index = null}) {
     final now = DateTime.now();
     final extension = path.extension(fileName);
     // 마이크로초까지 포함하여 더 정밀한 타임스탬프 생성
@@ -261,10 +263,10 @@ class NcpStorageService {
 
   // 비디오 파일 경로만 생성 (업로드하지 않음)
   String generateVideoPath(String fileName) {
-    // mp4 확장자만 허용
+    // mp4와 mov 확장자 허용 (아이폰 동영상 지원)
     final extension = path.extension(fileName).toLowerCase();
-    if (extension != '.mp4') {
-      throw Exception('비디오는 mp4 확장자만 허용됩니다.');
+    if (extension != '.mp4' && extension != '.mov') {
+      throw Exception('비디오는 mp4 또는 mov 확장자만 허용됩니다.');
     }
 
     final objectKey = _generateVideoObjectKey(fileName);

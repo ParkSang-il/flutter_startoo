@@ -16,7 +16,6 @@ class MyPageScreen extends StatefulWidget {
 
 class _MyPageScreenState extends State<MyPageScreen> {
   ArtistProfileData? _profileData;
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -26,26 +25,18 @@ class _MyPageScreenState extends State<MyPageScreen> {
 
   Future<void> _loadProfile() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    setState(() {
-      _isLoading = true;
-    });
 
     try {
       final response = await authProvider.getArtistProfile();
       if (mounted) {
         setState(() {
-          _isLoading = false;
           if (response.success && response.data != null) {
             _profileData = response.data;
           }
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      // 에러 처리 (필요시 추가)
     }
   }
 
@@ -62,41 +53,36 @@ class _MyPageScreenState extends State<MyPageScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        title: Row(
-          children: [
-            if (isBusinessUser) ...[
-              FaIcon(FontAwesomeIcons.shop),
-              const SizedBox(width: 5),
-            ],
-            Text(
-              title,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.bold,
+      // 사업자 회원은 AppBar 제거 → 커버 이미지가 최상단부터 보이도록
+      appBar: isBusinessUser
+          ? null
+          : AppBar(
+              elevation: 0,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              title: Text(
+                title,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+              actions: [
+                IconButton(
+                  onPressed: () {},
+                  icon: FaIcon(
+                    FontAwesomeIcons.squarePlus,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {},
+                  icon: FaIcon(
+                    FontAwesomeIcons.bars,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: FaIcon(
-              FontAwesomeIcons.squarePlus,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: FaIcon(
-              FontAwesomeIcons.bars,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-        ],
-      ),
       body: DefaultTabController(
         length: 2, // 탭 개수 (이미지, 영상)
         child: NestedScrollView(
